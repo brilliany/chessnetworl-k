@@ -172,6 +172,13 @@ public class Queen {
                 }
             }
         }
+        if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
+            if (getColor(chessboard[move.getToY()][move.getToX()]) != color) {
+                move.setCapture(true);
+            } else {
+                return false;
+            }
+        }
         return true;
     }
 }

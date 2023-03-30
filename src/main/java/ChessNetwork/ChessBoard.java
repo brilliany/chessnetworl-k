@@ -1,5 +1,6 @@
 package ChessNetwork;
 
+import ChessBot.PieceTables;
 import ChessNetwork.Game.BotPlayer;
 import ChessNetwork.Game.HumanPlayer;
 import ChessNetwork.Game.NeuralNetworkPlayer;
@@ -26,7 +27,7 @@ import java.util.List;
 import static ChessNetwork.ChessboardHelper.*;
 
 public class ChessBoard extends Application {
-    private final int DEPTH = 4;
+    private final int DEPTH = 7;
     private GridPane rootNode;
     @Getter
     private GridPane board;
@@ -90,6 +91,7 @@ public class ChessBoard extends Application {
     }
 
     private void addOptions(MoveGenerator moveGenerator) {
+        initNormalGame(moveGenerator);
         // Add a button to either play against the computer or against another player
         Button playAgainstComputerButton = new Button("Play against computer");
         Button playAgainstPlayerButton = new Button("Play against player");
@@ -108,12 +110,24 @@ public class ChessBoard extends Application {
 
     }
 
+    private void initNormalGame(MoveGenerator moveGenerator) {
+        //human vs human
+        Player whitePlayer = new HumanPlayer();
+        Player blackPlayer = new HumanPlayer();
+        moveGenerator.resetChessBoard();
+        updateChessBoard(moveGenerator);
+        ChessGame game = new ChessGame(whitePlayer, blackPlayer, moveGenerator);
+        moveGenerator.addMoveListener(move -> updateChessBoard(moveGenerator));
+        game.addMoveListener((message, winner) -> handleGameEnd(message, winner, moveGenerator));
+    }
+
     private void playAgainstEngine(Button playAgainstEngineButton, MoveGenerator moveGenerator) {
         // engine is ChessBot.class
         playAgainstEngineButton.setOnAction(event -> {
-            Player engine = new BotPlayer(DEPTH);
-            Player humanPlayer = new HumanPlayer();
             moveGenerator.resetChessBoard();
+            Player engine = new BotPlayer(DEPTH, new PieceTables(), BLACK, moveGenerator);
+            Player humanPlayer = new HumanPlayer();
+
             updateChessBoard(moveGenerator);
                 ChessGame game = new ChessGame(humanPlayer, engine, moveGenerator);
                 moveGenerator.addMoveListener(move -> updateChessBoard(moveGenerator));
@@ -219,7 +233,7 @@ public class ChessBoard extends Application {
         imageView.setOnMouseClicked(event -> {
             final int[] piece = moveGenerator.getChessboard()[y][x];
             System.out.println("Clicked on " + getPieceTypeAsStr(piece) + " at " + x + ", " + y);
-            Move[] moves = getPieceMoves(piece, x, y, moveGenerator.getChessboard(), moveGenerator, null);
+            Move[] moves = getPieceMoves(piece, x, y, moveGenerator.getChessboard(), moveGenerator);
             System.out.println("Moves: " + Arrays.toString(moves));
             for (Move move : moves) {
                 int row = move.getToY();

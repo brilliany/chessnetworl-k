@@ -2,7 +2,6 @@ package ChessNetwork.Pieces;
 
 import ChessNetwork.ChessboardHelper;
 import ChessNetwork.MoveGenerator;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
@@ -13,7 +12,7 @@ public class Pawn {
     boolean canBeEnPassanted = false;
 
 
-    public static Move[] getMoves(int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator, @Nullable int[] pawnWhichIsEnPassantable) {
+    public static Move[] getMoves(int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
         int[] thisPiece = chessboard[y][x];
         //if the pawn is at the end of the board it cant move
         int direction = color == WHITE ? -1 : 1;
@@ -37,6 +36,7 @@ public class Pawn {
         move = new Move(x, y, x + 1, y + direction, thisPiece);
 
         if (isValidCapture(move, chessboard, x,y,color)) {
+            move.setCapture(true);
             moves.add(move);
         }
 
@@ -44,18 +44,19 @@ public class Pawn {
         move = new Move(x, y, x - 1, y + direction, thisPiece);
 
         if (isValidCapture(move, chessboard, x,y,color)) {
+            move.setCapture(true);
             moves.add(move);
         }
-
-        // En passant
-        if (pawnWhichIsEnPassantable != null) {
+        if  (false) {
+            // En passant
             move = new Move(x, y, x + 1, y + direction, thisPiece);
-            if (canEnPassant(move, chessboard, x, y, color, pawnWhichIsEnPassantable)) {
+            move.setCapture(true);
+            if (canEnPassant(move, chessboard, x, y, color)) {
                 moves.add(move);
             }
             move = new Move(x, y, x - 1, y + direction, thisPiece);
-
-            if (canEnPassant(move, chessboard, x, y, color, pawnWhichIsEnPassantable)) {
+            move.setCapture(true);
+            if (canEnPassant(move, chessboard, x, y, color)) {
                 moves.add(move);
             }
         }
@@ -78,6 +79,10 @@ public class Pawn {
         //Check that the move isnt the same as the starting square
         int direction = color == WHITE ? -1 : 1;
         if (move.getToX() == x && move.getToY() == y) {
+            return false;
+        }
+        //check that the move is going straight forward
+        if (move.getToX() != x) {
             return false;
         }
         String moveType;
@@ -120,7 +125,7 @@ public class Pawn {
         }
         return false;
     }
-    public static boolean canEnPassant(Move move, int[][][] chessboard, int x, int y, int color, int[] pawnWhichIsEnPassantable) {
+    public static boolean canEnPassant(Move move, int[][][] chessboard, int x, int y, int color) {
         int direction = color == WHITE ? -1 : 1;
         int deltaX = move.getToX() - x;
         //check out of bounds
@@ -131,8 +136,8 @@ public class Pawn {
         boolean empty = isEmpty(move.getToX(), move.getToY(), chessboard);
         boolean notBlocked = getColor(chessboard[move.getToY()][move.getToX()]) != color;
         boolean isEnPassant = move.getToY() == y + direction && move.getToX() == x + deltaX;
-        boolean isEnPassantable = pawnWhichIsEnPassantable != null && pawnWhichIsEnPassantable[0] == move.getToX() && pawnWhichIsEnPassantable[1] == move.getToY();
-        return empty && notBlocked && isEnPassant && isEnPassantable;
+
+        return empty && notBlocked && isEnPassant;
     }
 
 }

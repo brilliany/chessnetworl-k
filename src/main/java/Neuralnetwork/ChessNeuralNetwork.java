@@ -2,25 +2,23 @@ package Neuralnetwork;
 
 import ChessNetwork.MoveGenerator;
 import ChessNetwork.Pieces.Move;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static ChessNetwork.ChessboardHelper.PAWN;
+import static ChessNetwork.ChessboardHelper.BLACK;
+import static ChessNetwork.ChessboardHelper.WHITE;
 
 public class ChessNeuralNetwork {
-    private static final int NUM_GENERATIONS = 2450;
-    public final int WHITE = 0;
-    public final int BLACK = 1;
-    private final int DEPTH = 5;
+    private static final int NUM_GENERATIONS = 1;
+
+    private final int DEPTH = 10;
 
     public static void main(String[] args) {
         ChessNeuralNetwork chessNeuralNetwork = new ChessNeuralNetwork();
-        chessNeuralNetwork.trainNetwork(50, NUM_GENERATIONS);
+        chessNeuralNetwork.trainNetwork(2, NUM_GENERATIONS);
     }
 
     NeuralNetwork bestNetwork;
@@ -63,8 +61,8 @@ public class ChessNeuralNetwork {
                         moveGenerator.print();
                     } else {
                         //game ended in a draw
-//                        moveGenerator.print();
-//                        System.out.println("The game ended in a draw.");
+                        moveGenerator.print();
+                        System.out.println("The game ended in a draw.");
                     }
                     endTime = System.currentTimeMillis();
                     // Print out the time taken to play the first game
@@ -135,8 +133,6 @@ public class ChessNeuralNetwork {
         List<int[]> prevMoves = new ArrayList<>();
         // Save the game in a file, so that it can be viewed later
         //variable to store the game
-        String game = "";
-        //variable to store each board state after each move by index
 
         //randomize who gets white and who gets black
         network1.setColor(Math.random() < 0.5 ? WHITE : BLACK);
@@ -151,13 +147,14 @@ public class ChessNeuralNetwork {
             } else {
                 currentNetwork = /*which network is black*/ network1.getColor() == BLACK ? network1 : network2;
             }
-            int[] pawnWhichIsEnPassantable = enPassantCheck(new AtomicReference<>(lastTwoMoves[0]));
-            pawnWhichIsEnPassantable = enPassantCheck(new AtomicReference<>(lastTwoMoves1[0])) == null ? enPassantCheck(new AtomicReference<>(lastTwoMoves1[0])) : pawnWhichIsEnPassantable;
-            int[] move = getMove(moveGenerator, currentNetwork, pawnWhichIsEnPassantable);
+            int[] move = getMove(moveGenerator, currentNetwork);
+
+            System.out.println("Move: " + move[0] + " " + move[1] + " " + move[2] + " " + move[3]);
 
             // End game if getMove returns an illegal move
             if (Arrays.equals(move, new int[]{-1, -1, -1, -1})) {
-                if (moveGenerator.isCheckmate(currentNetwork.getColor(), moveGenerator.getChessboard(), pawnWhichIsEnPassantable)) {
+                System.out.println("Illegal move");
+                if (moveGenerator.isCheckmate(currentNetwork.getColor(), moveGenerator.getChessboard())) {
                     System.out.println("Checkmate because of " + currentNetwork.getColor() + " player ");
                     return (currentNetwork.getColor() == WHITE) ? BLACK : WHITE;
                 } else if (moveGenerator.isStalemate(currentNetwork.getColor(), moveGenerator.getChessboard())) {
@@ -176,12 +173,10 @@ public class ChessNeuralNetwork {
 
             // Penalize for illegal move
             Move moveAsMove = new Move(move[0], move[1], move[2], move[3], moveGenerator.getChessboard()[move[1]][move[0]]);
-            if (moveGenerator.getChessboard()[move[1]][move[0]] == null) {
-                currentNetwork.setFitness(currentNetwork.getFitness() - 0.1);
-            } else {
-                moveGenerator.makeMove(moveAsMove, moveGenerator.getChessboard());
-                moveNumber++;
-            }
+
+            moveGenerator.makeMove(moveAsMove, moveGenerator.getChessboard());
+            moveNumber++;
+
             lastTwoMoves[0] = lastTwoMoves[1];
             lastTwoMoves[1] = moveAsMove;
             lastTwoMoves1[0] = lastTwoMoves1[1];
@@ -194,19 +189,10 @@ public class ChessNeuralNetwork {
     }
 
 
-    private int[] getMove(MoveGenerator moveGenerator, NeuralNetwork currentNetwork,@Nullable int[] pawnWhichIsEnPesantable) {
-        return currentNetwork.chooseMove(moveGenerator.getChessboard(), currentNetwork.getColor(), DEPTH, moveGenerator, pawnWhichIsEnPesantable);
+    private int[] getMove(MoveGenerator moveGenerator, NeuralNetwork currentNetwork) {
+        return currentNetwork.chooseMove(moveGenerator.getChessboard(), currentNetwork.getColor(), DEPTH, moveGenerator);
     }
 
-    @Nullable
-    private static int[] enPassantCheck(AtomicReference<Move> lastMove) {
-        int[] enPassantablePawn = null;
-        if (lastMove.get().getPiece()[0] == PAWN){
-            //if was double push, then create a new array containing the x and y of the pawn which is now en passantable
-            enPassantablePawn = new int[]{lastMove.get().getToX(), lastMove.get().getToY()};
-        }
-        return enPassantablePawn;
-    }
 
     private NeuralNetwork[] selectBestParents(NeuralNetwork[] population) {
         NeuralNetwork parent1 = null;

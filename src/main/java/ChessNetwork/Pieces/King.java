@@ -54,14 +54,16 @@ public class King {
         }
         // Castling
 
-            // Castling to the right
+            // Short castling
             move = new Move(x, y, x + 2, y, thisPiece);
             if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
+                move.setCastle(true);
                 moves.add(move);
             }
-            // Castling to the left
-            move = new Move(x, y, x + 2, y, thisPiece);
+            // Long castling
+            move = new Move(x, y, x - 2, y, thisPiece);
             if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
+                move.setCastle(true);
                 moves.add(move);
             }
 
@@ -87,38 +89,62 @@ public class King {
         if (Math.abs(move.getToX() - x) > 1 || Math.abs(move.getToY() - y) > 1) {
             return isValidCastle(move, chessboard, x, y, color, moveGenerator);
         }
-        if (!isEmpty(move.getToX(),move.getToY(), chessboard) && getColor(chessboard[move.getToY()][move.getToX()]) == color) {
+        if (getColor(chessboard[move.getToY()][move.getToX()]) == color) {
             return false;
         }
-
-        return move.getToX() != x || move.getToY() != y;
+        if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
+            if (getColor(chessboard[move.getToY()][move.getToX()]) != color) {
+                move.setCapture(true);
+            }
+        }
+        return true;
     }
 
     private static boolean isValidCastle(Move move, int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
-        boolean hasMoved = hasMoved(chessboard[y][x]);
-        if (hasMoved) {
-            return false;
-        }
-        if (move.getToX() == x + 2) {
+        if (move.getToX() == 6) {
             // Castling to the right
-            if (isEmpty(x+1,y,chessboard) || isEmpty(x+2,y,chessboard)) {
+            if (move.getToY() != y) {
+                return false;
+            }
+            //if not out of bounds
+            if(x + 2 > 7){
+                return false;
+            }
+            if (hasMoved(chessboard[y][x])) {
+                return false;
+            }
+            if (!isEmpty(x + 1, y, chessboard) || !isEmpty(x + 2, y, chessboard)) {
                 return false;
             }
             if (isInCheck(chessboard, x, y, color, moveGenerator)) {
                 return false;
             }
-            move.setCastle(true);
-            return true;
-        } else if (move.getToX() == x - 2) {
+            if (isInCheck(chessboard, x + 1, y, color, moveGenerator)) {
+                return false;
+            }
+            return !isInCheck(chessboard, x + 2, y, color, moveGenerator);
+        } else if (move.getToX() == 3) {
             // Castling to the left
-            if (isEmpty(x-1,y,chessboard) || isEmpty(x-2,y,chessboard) || isEmpty(x-3,y,chessboard)) {
+            if (move.getToY() != y) {
+                return false;
+            }
+            //if not out of bounds
+            if (x - 3 < 0) {
+                return false;
+            }
+            if (hasMoved(chessboard[y][x])) {
+                return false;
+            }
+            if (!isEmpty(x - 1, y, chessboard) || !isEmpty(x - 2, y, chessboard) || !isEmpty(x - 3, y, chessboard)) {
                 return false;
             }
             if (isInCheck(chessboard, x, y, color, moveGenerator)) {
                 return false;
             }
-            move.setCastle(true);
-            return true;
+            if (isInCheck(chessboard, x - 1, y, color, moveGenerator)) {
+                return false;
+            }
+            return !isInCheck(chessboard, x - 2, y, color, moveGenerator);
         }
         return false;
     }

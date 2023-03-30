@@ -5,6 +5,7 @@ import ChessNetwork.MoveGenerator;
 import java.util.ArrayList;
 
 import static ChessNetwork.ChessboardHelper.getColor;
+import static ChessNetwork.ChessboardHelper.isEmpty;
 
 public class Knight {
 
@@ -64,19 +65,24 @@ public class Knight {
         if (move.getToX() < 0 || move.getToX() > 7 || move.getToY() < 0 || move.getToY() > 7) {
             return false;
         }
-        //check that the starting square is right
+        //check starting square
         if (move.getFromX() != x || move.getFromY() != y) {
             return false;
         }
-        if (move.getToX() == x && move.getToY() == y) {
+        //check if the move is to one of the 8 possible squares (or less if the move is out of bounds)
+        if (move.getToX() != x + 1 && move.getToX() != x - 1 && move.getToX() != x + 2 && move.getToX() != x - 2) {
             return false;
         }
-        //if the move is not in L shape
-        if (Math.abs(move.getToX() - x) + Math.abs(move.getToY() - y) != 3) {
+        if (move.getToY() != y + 2 && move.getToY() != y - 2 && move.getToY() != y + 1 && move.getToY() != y - 1) {
             return false;
         }
-        if (chessboard[move.getToY()][move.getToX()] != null) {
-            return getColor(chessboard[move.getToY()][move.getToX()]) != color;
+        //check if the move is to an empty square
+        if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
+            if (getColor(chessboard[move.getToY()][move.getToX()]) != color) {
+                move.setCapture(true);
+            } else {
+                return false;
+            }
         }
         return true;
     }

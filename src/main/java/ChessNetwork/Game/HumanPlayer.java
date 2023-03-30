@@ -2,7 +2,6 @@ package ChessNetwork.Game;
 
 import ChessNetwork.ChessGame;
 import ChessNetwork.MoveGenerator;
-import org.jetbrains.annotations.Nullable;
 
 public class HumanPlayer extends Player {
 
@@ -11,7 +10,7 @@ public class HumanPlayer extends Player {
     }
 
     @Override
-    public void awaitMove(int[][][] boardState, int color, MoveGenerator moveGenerator, @Nullable int[] pawnWhichIsEnPassantable) {
+    public void awaitMove(int[][][] boardState, int color, MoveGenerator moveGenerator) {
         //do nothing, because the move will be made by the user
     }
 

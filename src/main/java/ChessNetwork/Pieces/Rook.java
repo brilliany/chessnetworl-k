@@ -103,7 +103,11 @@ public class Rook {
             }
         }
         if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
-            return getColor(chessboard[move.getToY()][move.getToX()]) != color;
+            if (getColor(chessboard[move.getToY()][move.getToX()]) != color) {
+                move.setCapture(true);
+            } else {
+                return false;
+            }
         }
         return true;
     }

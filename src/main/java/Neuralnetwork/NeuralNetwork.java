@@ -3,10 +3,11 @@ package Neuralnetwork;
 
 import ChessNetwork.MoveGenerator;
 import ChessNetwork.Pieces.Move;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.Random;
+
+import static ChessNetwork.ChessboardHelper.makeMoveSilent;
 
 public class NeuralNetwork implements Serializable {
     private final int inputSize;
@@ -22,7 +23,6 @@ public class NeuralNetwork implements Serializable {
     //score for if the next move is a capture
     private double captureScore;
     private double promotionScore;
-
 
 
     private final double mutationRate = 0.1;
@@ -138,6 +138,7 @@ public class NeuralNetwork implements Serializable {
     public void setInputBiases(double[] inputBiases) {
         this.inputBiases = inputBiases;
     }
+
     public double[] getInputBiases() {
         return inputBiases;
     }
@@ -166,31 +167,105 @@ public class NeuralNetwork implements Serializable {
         }
     }
 
-    public int[] chooseMove(int[][][] boardState, int color, int depth, MoveGenerator moveGenerator, @Nullable int[] pawnWhichIsEnPassantable) {
-        int[][][][] boards = getBoards(depth, boardState, color, moveGenerator, pawnWhichIsEnPassantable);
+    public int[] chooseMove(int[][][] boardState, int color, int depth, MoveGenerator moveGenerator) {
+        int[][][][] boards = getBoards(depth, boardState, color, moveGenerator);
         double[] inputLayer = createInputLayer(boards, depth, color);
+        double[] outputLayer = forwardPropagate(inputLayer);
+        double maxScore = Double.NEGATIVE_INFINITY;
+        int[] bestMove = null;
 
-        Move[] moves = moveGenerator.getAllMoves(color, boardState, pawnWhichIsEnPassantable);
-        if (moves.length == 0) {
-            return new int[] {-1, -1, -1, -1};
-        }
-
-        double[] hiddenLayer = calculateHiddenLayer(inputLayer);
-        double[] outputLayer = calculateOutputLayer(hiddenLayer);
-        int bestTimeline = 0;
-        double bestValue = 0;
-
-
-        for (int i = 0; i < outputLayer.length; i++) {
-            if (outputLayer[i] > bestValue) {
-                bestValue = outputLayer[i];
-                bestTimeline = i / moves.length;
+        for (Move move : moveGenerator.getAllMoves(color, boardState)) {
+            int[] moveCoords = new int[]{move.getFromX(), move.getFromY(), move.getToX(), move.getToY()};
+            double score = getMoveScore(move, outputLayer);
+            if (score > maxScore) {
+                maxScore = score;
+                bestMove = moveCoords;
             }
         }
-        // check for out of bounds for all of these
-        //get the best move from the output layer
-        return getBestMove(outputLayer, bestTimeline, moves);
+
+        return bestMove;
     }
+
+    private int[][][][] getBoards(int depth, int[][][] boardState, int color, MoveGenerator moveGenerator) {
+        int[][][][] boards = new int[depth][8][8][2];
+        boards[0] = boardState;
+        for (int i = 1; i < depth; i++) {
+            boards[i] = getBoardsHelper(boards[i - 1], color, moveGenerator);
+        }
+        return boards;
+    }
+
+    private int[][][] getBoardsHelper(int[][][] board, int color, MoveGenerator moveGenerator) {
+        int[][][] newBoard = new int[8][8][2];
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                newBoard[i][j][0] = board[i][j][0];
+                newBoard[i][j][1] = board[i][j][1];
+            }
+        }
+        for (Move move : moveGenerator.getAllMoves(color, board)) {
+            makeMoveSilent(move,newBoard);
+        }
+        return newBoard;
+    }
+
+    private double[] forwardPropagate(double[] inputLayer) {
+        double[] hiddenLayer = new double[hiddenSize];
+        double[] outputLayer = new double[outputSize];
+
+        // Calculate hidden layer
+        for (int i = 0; i < hiddenSize; i++) {
+            double sum = 0;
+            for (int j = 0; j < inputSize; j++) {
+                sum += inputLayer[j] * inputWeights[j][i];
+            }
+            sum += hiddenBiases[i];
+            hiddenLayer[i] = sigmoid(sum);
+        }
+
+        // Calculate output layer
+        for (int i = 0; i < outputSize; i++) {
+            double sum = 0;
+            for (int j = 0; j < hiddenSize; j++) {
+                sum += hiddenLayer[j] * hiddenWeights[j][i];
+            }
+            sum += outputBiases[i];
+            outputLayer[i] = sigmoid(sum);
+        }
+
+        return outputLayer;
+    }
+
+    private double getMoveScore(Move move, double[] outputLayer) {
+        int startRow = move.getFromY();
+        int startCol = move.getFromX();
+        int endRow = move.getToY();
+        int endCol = move.getToX();
+
+        int startIndex = startRow * 8 + startCol;
+        int endIndex = endRow * 8 + endCol;
+        int promotionIndex = 64 + (endCol * 4) + (endRow == 7 ? 0 : 1);
+
+
+        double captureValue = move.isCapture() ? captureScore : 0;
+        double promotionValue = isPromotion(move) ? promotionScore : 0;
+        double startIndexValue = outputLayer[startIndex];
+        double endIndexValue = outputLayer[endIndex];
+        double promotionIndexValue = outputLayer[promotionIndex];
+
+        double score = captureValue + promotionValue + startIndexValue + endIndexValue + promotionIndexValue;
+        System.out.println("Move: " + move + " Score: " + score);
+        return score;
+    }
+
+    private boolean isPromotion(Move move) {
+        int endRow = move.getToY();
+        int[] piece = move.getPiece();
+        if (piece[0] == 1 && endRow == 7) {
+            return true;
+        } else return piece[0] == -1 && endRow == 0;
+    }
+
 
     private int[] getBestMove(double[] outputLayer, int bestTimeline, Move[] moves) {
         int bestMoveIndex = 0;
@@ -203,7 +278,6 @@ public class NeuralNetwork implements Serializable {
         }
         return getMoveFromIndex(bestMoveIndex, moves);
     }
-
 
 
     private int[] getMoveFromIndex(int bestMoveIndex, Move[] moves) {
@@ -243,60 +317,30 @@ public class NeuralNetwork implements Serializable {
 
     private double[] createInputLayer(int[][][][] boards, int depth, int color) {
         double[] inputLayer = new double[inputSize];
-        int index = 0;
+        int[] pieceValues = new int[]{0,1, 2, 3, 4, 5, 6};
+        int[] pieceWeights = new int[]{0, 1, 3, 3, 5, 9};
+        int[] pieceSquares = new int[7];
+
         for (int i = 0; i < depth; i++) {
             for (int j = 0; j < 8; j++) {
                 for (int k = 0; k < 8; k++) {
-                    if (boards[i][j][k][0] == color) {
-                        inputLayer[index] = 1;
-                    } else if (boards[i][j][k][0] == -color) {
-                        inputLayer[index] = -1;
-                    } else {
-                        inputLayer[index] = 0;
+                    int pieceType = Math.abs(boards[i][j][k][0]);
+                    int pieceColor = boards[i][j][k][1];
+                    if (pieceType != 0) {
+                        pieceSquares[pieceType] += (pieceColor == color) ? 1 : -1;
                     }
-                    index++;
                 }
             }
         }
+
+        for (int i = 0; i < pieceValues.length; i++) {
+            inputLayer[i] = pieceValues[i] * pieceSquares[i];
+        }
+
         return inputLayer;
     }
 
-    private int[][][][] getBoards(int depth, int[][][] boardState, int color, MoveGenerator moveGenerator, @Nullable int[] pawnWhichIsEnPassantable) {
-        int[][][][] futureBoards = new int[depth][8][8][2];
-        // Calculate all future boards until the given depth
-        // Color in this case is the color of the player whose turn it is
-        // board[y][x] is the coordinate system
-        // store the pieces as integers instead of Pieces to save memory with the piecetype enum
-        //this method should just return the boards, the best sequences are calculated later
-        // loop through all the moves that can be made
-
-        //copy the current board into the first board in the array
-        for (int i = 0; i < 8; i++) {
-            System.arraycopy(boardState[i], 0, futureBoards[0][i], 0, 8);
-        }
-
-        for (int i = 1; i < depth; i++) {
-            //copy the previous board into the current board
-            for (int j = 0; j < 8; j++) {
-                System.arraycopy(futureBoards[i - 1][j], 0, futureBoards[i][j], 0, 8);
-            }
-            //loop through all the moves that can be made
-            Move[] moves = moveGenerator.getAllMoves(color, futureBoards[i], pawnWhichIsEnPassantable);
-            for (Move move : moves) {
-                //move the piece
-                futureBoards[i][move.getToY()][move.getToX()][0] = futureBoards[i][move.getFromY()][move.getFromX()][0];
-                futureBoards[i][move.getToY()][move.getToX()][1] = futureBoards[i][move.getFromY()][move.getFromX()][1];
-                //remove the piece from the old position
-                futureBoards[i][move.getFromY()][move.getFromX()][0] = 0;
-                futureBoards[i][move.getFromY()][move.getFromX()][1] = 0;
-            }
-        }
-
-        return futureBoards;
-    }
-
-    public static double sigmoid(double x) {
+    private double sigmoid(double x) {
         return 1 / (1 + Math.exp(-x));
     }
-
 }

@@ -8,6 +8,7 @@ public class Move {
 
     private int[] piece;
     private boolean castle;
+    private boolean capture;
 
     public Move(int x, int y, int newX, int newY, int[] piece) {
         // Check if the move is out of bounds
@@ -47,5 +48,12 @@ public class Move {
     }
     public void setPiece(int[] piece) {
         this.piece = piece;
+    }
+
+    public boolean isCapture() {
+        return capture;
+    }
+    public void setCapture(boolean capture) {
+        this.capture = capture;
     }
 }

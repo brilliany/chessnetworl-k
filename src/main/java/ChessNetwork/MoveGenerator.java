@@ -2,10 +2,9 @@ package ChessNetwork;
 
 
 import ChessNetwork.Pieces.*;
-import org.apache.commons.lang.ArrayUtils;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static ChessNetwork.ChessboardHelper.*;
@@ -50,39 +49,6 @@ public class MoveGenerator {
         * 4  2  3  5  6  3  2  4
         * */
 
-//        chessboard[0][0] = new int[]{BLACK*ROOK, HAS_NOT_MOVED};
-//        chessboard[0][1] = new int[]{BLACK*KNIGHT, HAS_NOT_MOVED};
-//        chessboard[0][2] = new int[]{BLACK*BISHOP, HAS_NOT_MOVED};
-//        chessboard[0][3] = new int[]{BLACK*QUEEN, HAS_NOT_MOVED};
-//        chessboard[0][4] = new int[]{BLACK*KING, HAS_NOT_MOVED};
-//        chessboard[0][5] = new int[]{BLACK*BISHOP, HAS_NOT_MOVED};
-//        chessboard[0][6] = new int[]{BLACK*KNIGHT, HAS_NOT_MOVED};
-//        chessboard[0][7] = new int[]{BLACK*ROOK, HAS_NOT_MOVED};
-//        for (int i = 0; i < 8; i++) {
-//            chessboard[1][i] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-//        }
-//        chessboard[7][0] = new int[]{WHITE*ROOK, HAS_NOT_MOVED};
-//        chessboard[7][1] = new int[]{WHITE*KNIGHT, HAS_NOT_MOVED};
-//        chessboard[7][2] = new int[]{WHITE*BISHOP, HAS_NOT_MOVED};
-//        chessboard[7][3] = new int[]{WHITE*QUEEN, HAS_NOT_MOVED};
-//        chessboard[7][4] = new int[]{WHITE*KING, HAS_NOT_MOVED};
-//        chessboard[7][5] = new int[]{WHITE*BISHOP, HAS_NOT_MOVED};
-//        chessboard[7][6] = new int[]{WHITE*KNIGHT, HAS_NOT_MOVED};
-//        chessboard[7][7] = new int[]{WHITE*ROOK, HAS_NOT_MOVED};
-//        for (int i = 0; i < 8; i++) {
-//            chessboard[6][i] = new int[]{WHITE*PAWN, HAS_NOT_MOVED};
-//        }
-//
-//        //empty squares
-//        for (int i = 2; i < 6; i++) {
-//            for (int j = 0; j < 8; j++) {
-//                chessboard[i][j] = EMPTY_SQUARE;
-//            }
-//        }
-        // test position to test engine against, random position with a lot of possible moves:
-        // initialize the chessboard
-
-// black pieces
         chessboard[0][0] = new int[]{BLACK*ROOK, HAS_NOT_MOVED};
         chessboard[0][1] = new int[]{BLACK*KNIGHT, HAS_NOT_MOVED};
         chessboard[0][2] = new int[]{BLACK*BISHOP, HAS_NOT_MOVED};
@@ -91,16 +57,9 @@ public class MoveGenerator {
         chessboard[0][5] = new int[]{BLACK*BISHOP, HAS_NOT_MOVED};
         chessboard[0][6] = new int[]{BLACK*KNIGHT, HAS_NOT_MOVED};
         chessboard[0][7] = new int[]{BLACK*ROOK, HAS_NOT_MOVED};
-        chessboard[1][0] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-        chessboard[1][1] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-        chessboard[1][2] = EMPTY_SQUARE;
-        chessboard[1][3] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-        chessboard[1][4] = EMPTY_SQUARE;
-        chessboard[1][5] = EMPTY_SQUARE;
-        chessboard[1][6] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-        chessboard[1][7] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
-
-// white pieces
+        for (int i = 0; i < 8; i++) {
+            chessboard[1][i] = new int[]{BLACK*PAWN, HAS_NOT_MOVED};
+        }
         chessboard[7][0] = new int[]{WHITE*ROOK, HAS_NOT_MOVED};
         chessboard[7][1] = new int[]{WHITE*KNIGHT, HAS_NOT_MOVED};
         chessboard[7][2] = new int[]{WHITE*BISHOP, HAS_NOT_MOVED};
@@ -109,23 +68,16 @@ public class MoveGenerator {
         chessboard[7][5] = new int[]{WHITE*BISHOP, HAS_NOT_MOVED};
         chessboard[7][6] = new int[]{WHITE*KNIGHT, HAS_NOT_MOVED};
         chessboard[7][7] = new int[]{WHITE*ROOK, HAS_NOT_MOVED};
-        chessboard[6][0] = new int[]{WHITE*PAWN, HAS_NOT_MOVED};
-        chessboard[6][1] = new int[]{WHITE*PAWN, HAS_NOT_MOVED};
-        chessboard[6][2] = EMPTY_SQUARE;
-        chessboard[6][3] = EMPTY_SQUARE;
-        chessboard[6][4] = EMPTY_SQUARE;
-        chessboard[6][5] = new int[]{WHITE*BISHOP, HAS_NOT_MOVED};
-        chessboard[6][6] = new int[]{WHITE*PAWN, HAS_NOT_MOVED};
-
-// empty squares
-        for (int i = 2; i < 6; i++) {
-            for (int j = 0; j < 8; j++) {
-                if (chessboard[i][j] == null) {
-                    chessboard[i][j] = EMPTY_SQUARE;
-                }
-            }
+        for (int i = 0; i < 8; i++) {
+            chessboard[6][i] = new int[]{WHITE*PAWN, HAS_NOT_MOVED};
         }
 
+        //empty squares
+        for (int i = 2; i < 6; i++) {
+            for (int j = 0; j < 8; j++) {
+                chessboard[i][j] = EMPTY_SQUARE;
+            }
+        }
     }
     // All of the piece classes have a getMoves method that returns a list of moves for a position
     public int[][][] getChessboard() {
@@ -134,36 +86,43 @@ public class MoveGenerator {
 
 
     public void makeMove(Move move, int[][][] boardState) {
+        int color = ChessboardHelper.getColor(boardState[move.getFromY()][move.getFromX()]);
         // The pieces check themselves if the move is valid
         // This is the method that updates the chessboard
         if (move.isCastle()) {
             // coordinates are stored like chessboard[y][x]
             // so the rook is at the same y as the king
             // and the y is either 0 or 7
-            int color = ChessboardHelper.getColor(boardState[move.getToY()][move.getToX()]);
+
             int y = move.getToY();
-            // the rook is either at 0 or 7
-            int rookX = move.getToX() == 2 ? 0 : 7;
-            // the king is either at 2 or 6
-            int kingX = move.getToX() == 2 ? 2 : 6;
+
             // short castling
-            if (move.getToX() == 2) {
-                // move the rook
-                setSquare(rookX,y, EMPTY_SQUARE,HAS_NOT_MOVED, boardState);
-                //add the rook where the king was (king gets removed at the same time)
-                setSquare(kingX,y, new int[]{ROOK*color}, HAS_MOVED, boardState);
-                // move the king
-                setSquare(rookX - 1,y, new int[]{KING*color}, HAS_MOVED, boardState);
+            if (move.getToX() == 6) {
+                // the move is valid since the piece checked it
+                // so we can just update the chessboard
+                setSquare(4, y, EMPTY_SQUARE, HAS_NOT_MOVED, boardState);
+                setSquare(6, y, new int[]{KING*color}, HAS_MOVED, boardState);
+                setSquare(7, y, EMPTY_SQUARE, HAS_NOT_MOVED, boardState);
+                setSquare(5, y, new int[]{ROOK*color}, HAS_MOVED, boardState);
             } else {
-                // long castling
-                // move the rook
-                setSquare(rookX,y, EMPTY_SQUARE,HAS_NOT_MOVED, boardState);
-                //add the rook
-                setSquare(kingX-1,y, new int[]{ROOK*color}, HAS_MOVED, boardState);
-                // move the king
-                setSquare(rookX + 2,y, new int[]{KING*color}, HAS_MOVED, boardState);
+                // the move is valid since the piece checked it
+                // so we can just update the chessboard
+                setSquare(4, y, EMPTY_SQUARE, HAS_NOT_MOVED, boardState);
+                setSquare(2, y, new int[]{KING*color}, HAS_MOVED, boardState);
+                setSquare(0, y, EMPTY_SQUARE, HAS_NOT_MOVED, boardState);
+                setSquare(3, y, new int[]{ROOK*color}, HAS_MOVED, boardState);
             }
             // Trigger event
+            callMoveListeners(move);
+            return;
+        }
+        int pawnDestination = color == WHITE ? 7 : 0;
+        //promotion
+        if (move.getPiece()[0] == PAWN && move.getToY() == pawnDestination) {
+            // the move is valid since the piece checked it
+            // so we can just update the chessboard
+            setSquare(move.getFromX(), move.getFromY(), EMPTY_SQUARE, HAS_NOT_MOVED, boardState);
+            setSquare(move.getToX(), move.getToY(), new int[]{QUEEN}, HAS_MOVED, boardState);
             callMoveListeners(move);
         }
         // the move is valid since the piece checked it
@@ -206,15 +165,18 @@ public class MoveGenerator {
         moveListeners.remove(listener);
     }
 
-    public Move[] getAllMoves(int color, int[][][] boardState, @Nullable int[] pawnWhichIsEnPassantable) {
+    public Move[] getAllMoves(int color, int[][][] boardState) {
         Move[] allMoves = new Move[0];
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 if (boardState[i][j][0] != 0 && getColor(boardState[i][j]) == color) {
                     //loop and get the corresponding class for the piece
-                    Move[] moves = ChessboardHelper.getPieceMoves(boardState[i][j], j, i, boardState, this, pawnWhichIsEnPassantable);
+                    Move[] moves = ChessboardHelper.getPieceMoves(boardState[i][j], j, i, boardState, this);
                     //add the moves to the list
-                    allMoves = (Move[]) ArrayUtils.addAll(allMoves, moves);
+                    for (Move move : moves) {
+                        allMoves = Arrays.copyOf(allMoves, allMoves.length + 1);
+                        allMoves[allMoves.length - 1] = move;
+                    }
                 }
             }
         }
@@ -250,10 +212,10 @@ public class MoveGenerator {
         }
     }
 
-    public boolean isCheckmate(int color, int[][][] boardState, @Nullable int[] pawnWhichIsEnPassantable) {
+    public boolean isCheckmate(int color, int[][][] boardState) {
         // Check if the given color is in check
         if (isCheck(color, boardState)) {
-            Move[] allMoves = getAllMoves(color, boardState, pawnWhichIsEnPassantable);
+            Move[] allMoves = getAllMoves(color, boardState);
             for (Move move : allMoves) {
                 if (!putsKingInCheck(move, boardState)) {
                     return false;
@@ -267,7 +229,7 @@ public class MoveGenerator {
     public boolean isStalemate(int color, int[][][] boardState) {
         // Check if the given color is not in check
         if (!isCheck(color, boardState)) {
-            Move[] allMoves = getAllMoves(color, boardState, null);
+            Move[] allMoves = getAllMoves(color, boardState);
             for (Move move : allMoves) {
                 if (!putsKingInCheck(move, boardState)) {
                     return false;
