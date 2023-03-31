@@ -9,135 +9,91 @@ import static ChessNetwork.ChessboardHelper.*;
 
 public class Pawn {
 
-    boolean canBeEnPassanted = false;
 
 
-    public static Move[] getMoves(int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
-        int[] thisPiece = chessboard[y][x];
-        //if the pawn is at the end of the board it cant move
-        int direction = color == WHITE ? -1 : 1;
-        if (y == 0 || y == 7) {
-            return new Move[0];
-        }
-
+    public static Move[] getMoves(int x, int y, int color, MoveGenerator moveGenerator) {
+        //Color is 1 for white and -1 for black, so we can use it to determine the direction of the pawn
         ArrayList<Move> moves = new ArrayList<>();
-        // Move up
-        Move move = new Move(x, y, x, y + direction, thisPiece);
-        if (isValidMove(move, chessboard, x, y, color)) {
-            moves.add(move);
-        }
-        // Move up 2
-        move = new Move(x, y, x, y + direction * 2, thisPiece);
+        //shift bitboard one and step in the direction of the pawn (*color to get the right direction)
+        long oneStep = 1L << (x+8*(y+color));
+        long twoStep = 1L << (x+16*(y+color));
+        long captureLeft = 1L << (x-1+8*(y+color));
+        long captureRight = 1L << (x+1+8*(y+color));
 
-        if (isValidMove(move, chessboard, x,y,color)) {
-            moves.add(move);
-        }
-        // Move up right
-        move = new Move(x, y, x + 1, y + direction, thisPiece);
-
-        if (isValidCapture(move, chessboard, x,y,color)) {
-            move.setCapture(true);
-            moves.add(move);
-        }
-
-        // Move up left
-        move = new Move(x, y, x - 1, y + direction, thisPiece);
-
-        if (isValidCapture(move, chessboard, x,y,color)) {
-            move.setCapture(true);
-            moves.add(move);
-        }
-        if  (false) {
-            // En passant
-            move = new Move(x, y, x + 1, y + direction, thisPiece);
-            move.setCapture(true);
-            if (canEnPassant(move, chessboard, x, y, color)) {
-                moves.add(move);
+        //get if the move is blocked
+        switch (color) {
+            case WHITE -> {
+                long pieces = moveGenerator.getWhitePieces();
+                ChessboardHelper.printBitboardAsChessboard(pieces);
+                //if the onestep bit is empty in the whitePieces bitboard, add it to the moves
+                if ((pieces & oneStep) == 0) {
+                    moves.add(new Move(x, y, x, y + color, PAWN*WHITE));
+                    //if the pawn hasnt moved, check if the two step move is empty
+                    if (y == 1) {
+                        if ((pieces & twoStep) == 0) {
+                            moves.add(new Move(x, y, x, y + color * 2, PAWN*WHITE));
+                        }
+                    }
+                }
+                //check if the capture moves are valid
+                if ((moveGenerator.getBlackPieces() & captureLeft) != 0) {
+                    moves.add(new Move(x, y, x - 1, y + color, PAWN*WHITE));
+                }
+                if ((moveGenerator.getBlackPieces() & captureRight) != 0) {
+                    moves.add(new Move(x, y, x + 1, y + color, PAWN*WHITE));
+                }
+                //en passant
+                long blackPiecesPrev = moveGenerator.getBlackPiecesPrevious();
+                //if the pawn is on the 5th rank, check if the previous move was a double step move
+                if (y == 4) {
+                    //if the previous move was a double step move, check if the pawn is on the right side
+                    enPassantCheck(x, y, color, moves, twoStep, blackPiecesPrev, WHITE);
+                }
             }
-            move = new Move(x, y, x - 1, y + direction, thisPiece);
-            move.setCapture(true);
-            if (canEnPassant(move, chessboard, x, y, color)) {
-                moves.add(move);
+            case BLACK -> {
+                long pieces = moveGenerator.getBlackPieces();
+                //if the onestep bit is empty in the blackPieces bitboard, add it to the moves
+                if ((pieces & oneStep) == 0) {
+                    moves.add(new Move(x, y, x, y + color, PAWN*BLACK));
+                    //if the pawn hasnt moved, check if the two step move is empty
+                    if (y == 6) {
+                        if ((pieces & twoStep) == 0) {
+                            moves.add(new Move(x, y, x, y + color * 2, PAWN*BLACK));
+                        }
+                    }
+                }
+                //check if the capture moves are valid
+                if ((moveGenerator.getWhitePieces() & captureLeft) != 0) {
+                    moves.add(new Move(x, y, x - 1, y + color, PAWN*BLACK));
+                }
+                if ((moveGenerator.getWhitePieces() & captureRight) != 0) {
+                    moves.add(new Move(x, y, x + 1, y + color, PAWN*BLACK));
+                }
+                //en passant
+                long whitePiecesPrev = moveGenerator.getWhitePiecesPrevious();
+                //if the pawn is on the 5th rank, check if the previous move was a double step move
+                if (y == 3) {
+                    //if the previous move was a double step move, check if the pawn is on the right side
+                    enPassantCheck(x, y, color, moves, twoStep, whitePiecesPrev, BLACK);
+                }
             }
         }
-        if (moveGenerator != null) {
-            moves.removeIf(move1 -> moveGenerator.putsKingInCheck(move1, chessboard));
-        }
-
+        System.out.println("Pawn moves: " + moves);
         return moves.toArray(new Move[0]);
     }
 
-    public static boolean isValidMove(Move move, int[][][] chessboard, int x, int y, int color) {
-        //check out of bounds
-        if (move.getToX() < 0 || move.getToX() > 7 || move.getToY() < 0 || move.getToY() > 7) {
-            return false;
-        }
-        //check that the starting square is right
-        if (move.getFromX() != x || move.getFromY() != y) {
-            return false;
-        }
-        //Check that the move isnt the same as the starting square
-        int direction = color == WHITE ? -1 : 1;
-        if (move.getToX() == x && move.getToY() == y) {
-            return false;
-        }
-        //check that the move is going straight forward
-        if (move.getToX() != x) {
-            return false;
-        }
-        String moveType;
-        //check if the move is a single or a double push
-        if (move.getToY() == y + direction && move.getToX() == x) {
-            moveType = "single";
-        } else if (move.getToY() == y + direction * 2 && move.getToX() == x) {
-            moveType = "double";
-        } else {
-            return false;
-        }
-        //check if the move is blocked
-        if (moveType.equals("double")) {
-            if (ChessboardHelper.isEmpty(x, y + direction, chessboard)) {
-                boolean hasMoved = hasMoved(chessboard[y][x]);
-                if (hasMoved) {
-                    return false;
-                }
-                return ChessboardHelper.isEmpty(x, y + direction * 2, chessboard);
-            }
-        } else {
-            return isEmpty(x, y + direction, chessboard);
-        }
-        return false;
-    }
-    public static boolean isValidCapture(Move move, int[][][] chessboard, int x, int y, int color) {
-        int direction = color == WHITE ? -1 : 1;
-        //check out of bounds
-        if (move.getToY() < 0 || move.getToY() > 7 || move.getToX() < 0 || move.getToX() > 7) {
-            return false;
-        }
-
-        //check if there is a piece to capture
-        if (move.getToY() == y + direction) {
-            if (move.getToX() == x + 1 || move.getToX() == x - 1) {
-                if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
-                    return getColor(chessboard[move.getToY()][move.getToX()]) != color;
-                }
+    private static void enPassantCheck(int x, int y, int color, ArrayList<Move> moves, long twoStep, long whitePiecesPrev, int black) {
+        if ((whitePiecesPrev & twoStep) != 0) {
+            //if the pawn is on the right side, check if the pawn is on the right side
+            if (x == 0) {
+                moves.add(new Move(x, y, x + 1, y + color, PAWN* black));
+            } else if (x == 7) {
+                moves.add(new Move(x, y, x - 1, y + color, PAWN* black));
+            } else {
+                moves.add(new Move(x, y, x + 1, y + color, PAWN* black));
+                moves.add(new Move(x, y, x - 1, y + color, PAWN* black));
             }
         }
-        return false;
-    }
-    public static boolean canEnPassant(Move move, int[][][] chessboard, int x, int y, int color) {
-        int direction = color == WHITE ? -1 : 1;
-        int deltaX = move.getToX() - x;
-        //check out of bounds
-        if (move.getToY() < 0 || move.getToY() > 7 || move.getToX() < 0 || move.getToX() > 7) {
-            return false;
-        }
-
-        boolean empty = isEmpty(move.getToX(), move.getToY(), chessboard);
-        boolean notBlocked = getColor(chessboard[move.getToY()][move.getToX()]) != color;
-        boolean isEnPassant = move.getToY() == y + direction && move.getToX() == x + deltaX;
-
-        return empty && notBlocked && isEnPassant;
     }
 
 }

@@ -9,192 +9,149 @@ import static ChessNetwork.ChessboardHelper.*;
 
 public class King {
 
-    public static Move[] getMoves(int[][][] chessboard, int x, int y, int color,MoveGenerator moveGenerator) {
-        int[] thisPiece = chessboard[y][x];
+    public static Move[] getMoves(int x, int y, int color,MoveGenerator moveGenerator) {
+
         ArrayList<Move> moves = new ArrayList<>();
-        // Move up
-        Move move = new Move(x, y, x, y - 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move down
-        move = new Move(x, y, x, y + 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move right
-        move = new Move(x, y, x + 1, y, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move left
-        move = new Move(x, y, x - 1, y, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move up right
-        move = new Move(x, y, x + 1, y - 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move up left
-        move = new Move(x, y, x - 1, y - 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move down right
-        move = new Move(x, y, x + 1, y + 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Move down left
-        move = new Move(x, y, x - 1, y + 1, thisPiece);
-        if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-            moves.add(move);
-        }
-        // Castling
+        long whitePieces = moveGenerator.getWhitePieces();
+        long blackPieces = moveGenerator.getBlackPieces();
+        int opponentColor = color == WHITE ? BLACK : WHITE;
 
-            // Short castling
-            move = new Move(x, y, x + 2, y, thisPiece);
-            if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-                move.setCastle(true);
-                moves.add(move);
-            }
-            // Long castling
-            move = new Move(x, y, x - 2, y, thisPiece);
-            if (isValidMove(move, chessboard, x, y,color, moveGenerator)) {
-                move.setCastle(true);
-                moves.add(move);
-            }
+        // up
+        long up = (y+1L)*8 + x;
+        if ((whitePieces & up) == 0 && (blackPieces & up) == 0) {
+            moves.add(new Move(x, y, x, y+1, KING));
+        } else if ((whitePieces & up) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x, y+1, KING));
+        } else if ((blackPieces & up) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x, y+1, KING));
+        }
+        // down
+        long down = (y-1L)*8 + x;
+        if ((whitePieces & down) == 0 && (blackPieces & down) == 0) {
+            moves.add(new Move(x, y, x, y-1, KING));
+        } else if ((whitePieces & down) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x, y-1, KING));
+        } else if ((blackPieces & down) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x, y-1, KING));
+        }
+        // right
+        long right = y* 8L + x+1L;
+        if ((whitePieces & right) == 0 && (blackPieces & right) == 0) {
+            moves.add(new Move(x, y, x+1, y, KING));
+        } else if ((whitePieces & right) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x+1, y, KING));
+        } else if ((blackPieces & right) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x+1, y, KING));
+        }
+        // left
+        long left = y* 8L + x-1L;
+        if ((whitePieces & left) == 0 && (blackPieces & left) == 0) {
+            moves.add(new Move(x, y, x-1, y, KING));
+        } else if ((whitePieces & left) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x-1, y, KING));
+        } else if ((blackPieces & left) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x-1, y, KING));
+        }
+        // up right
+        long upRight = (y+1L)*8 + x+1L;
+        if ((whitePieces & upRight) == 0 && (blackPieces & upRight) == 0) {
+            moves.add(new Move(x, y, x+1, y+1, KING));
+        } else if ((whitePieces & upRight) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x+1, y+1, KING));
+        } else if ((blackPieces & upRight) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x+1, y+1, KING));
+        }
+        // up left
+        long upLeft = (y+1L)*8 + x-1L;
+        if ((whitePieces & upLeft) == 0 && (blackPieces & upLeft) == 0) {
+            moves.add(new Move(x, y, x-1, y+1, KING));
+        } else if ((whitePieces & upLeft) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x-1, y+1, KING));
+        } else if ((blackPieces & upLeft) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x-1, y+1, KING));
+        }
+        // down right
+        long downRight = (y-1L)*8 + x+1L;
+        if ((whitePieces & downRight) == 0 && (blackPieces & downRight) == 0) {
+            moves.add(new Move(x, y, x+1, y-1, KING));
+        } else if ((whitePieces & downRight) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x+1, y-1, KING));
+        } else if ((blackPieces & downRight) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x+1, y-1, KING));
+        }
+        // down left
+        long downLeft = (y-1L)*8 + x-1L;
+        if ((whitePieces & downLeft) == 0 && (blackPieces & downLeft) == 0) {
+            moves.add(new Move(x, y, x-1, y-1, KING));
+        } else if ((whitePieces & downLeft) == 0 && color == WHITE) {
+            moves.add(new Move(x, y, x-1, y-1, KING));
+        } else if ((blackPieces & downLeft) == 0 && color == BLACK) {
+            moves.add(new Move(x, y, x-1, y-1, KING));
+        }
+        // castling
+        handleCastling(moves, x, y, color, moveGenerator);
 
-
-            if (moveGenerator != null) {
-                moves.removeIf(move1 -> moveGenerator.putsKingInCheck(move1, chessboard));
-            }
         return moves.toArray(new Move[0]);
     }
 
-    public static boolean isValidMove(Move move, int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
-        //check out of bounds
-        if (move.getToX() < 0 || move.getToX() > 7 || move.getToY() < 0 || move.getToY() > 7) {
-            return false;
+    private static void handleCastling(ArrayList<Move> moves, int x, int y, int color, MoveGenerator moveGenerator) {
+        if (moveGenerator.isCheck(color)){
+            return;
         }
-        //check that the starting square is right
-        if (move.getFromX() != x || move.getFromY() != y) {
-            return false;
-        }
-        if (move.getToX() == x && move.getToY() == y) {
-            return false;
-        }
-        if (Math.abs(move.getToX() - x) > 1 || Math.abs(move.getToY() - y) > 1) {
-            return isValidCastle(move, chessboard, x, y, color, moveGenerator);
-        }
-        if (getColor(chessboard[move.getToY()][move.getToX()]) == color) {
-            return false;
-        }
-        if (!isEmpty(move.getToX(), move.getToY(), chessboard)) {
-            if (getColor(chessboard[move.getToY()][move.getToX()]) != color) {
-                move.setCapture(true);
+        boolean rightsShort = moveGenerator.getCastleRights(color, 0);
+        boolean rightsLong = moveGenerator.getCastleRights(color, 1);
+        long whitePieces = moveGenerator.getWhitePieces();
+        long blackPieces = moveGenerator.getBlackPieces();
+        int opponentColor = color == WHITE ? BLACK : WHITE;
+        if (color == WHITE) {
+            if (rightsShort) {
+                //if the squares between the king and the rook are empty
+                if ((whitePieces & (1L << 61)) == 0 && (whitePieces & (1L << 62)) == 0) {
+                    //if the squares are not attacked by the opponent
+                    int firstSquareX = 5;
+                    int secondSquareX = 6;
+                    if (!moveGenerator.isAttacked(firstSquareX, 0, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 0, opponentColor)) {
+                        moves.add(new Move(x, y, 6, y, KING));
+                    }
+                }
             }
-        }
-        return true;
-    }
-
-    private static boolean isValidCastle(Move move, int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
-        if (move.getToX() == 6) {
-            // Castling to the right
-            if (move.getToY() != y) {
-                return false;
-            }
-            //if not out of bounds
-            if(x + 2 > 7){
-                return false;
-            }
-            if (hasMoved(chessboard[y][x])) {
-                return false;
-            }
-            if (!isEmpty(x + 1, y, chessboard) || !isEmpty(x + 2, y, chessboard)) {
-                return false;
-            }
-            if (isInCheck(chessboard, x, y, color, moveGenerator)) {
-                return false;
-            }
-            if (isInCheck(chessboard, x + 1, y, color, moveGenerator)) {
-                return false;
-            }
-            return !isInCheck(chessboard, x + 2, y, color, moveGenerator);
-        } else if (move.getToX() == 3) {
-            // Castling to the left
-            if (move.getToY() != y) {
-                return false;
-            }
-            //if not out of bounds
-            if (x - 3 < 0) {
-                return false;
-            }
-            if (hasMoved(chessboard[y][x])) {
-                return false;
-            }
-            if (!isEmpty(x - 1, y, chessboard) || !isEmpty(x - 2, y, chessboard) || !isEmpty(x - 3, y, chessboard)) {
-                return false;
-            }
-            if (isInCheck(chessboard, x, y, color, moveGenerator)) {
-                return false;
-            }
-            if (isInCheck(chessboard, x - 1, y, color, moveGenerator)) {
-                return false;
-            }
-            return !isInCheck(chessboard, x - 2, y, color, moveGenerator);
-        }
-        return false;
-    }
-
-    private static boolean isInCheck(int[][][] chessboard, int x, int y, int color, MoveGenerator moveGenerator) {
-        // Check if the king is in check
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                //in this case i is the y and j is the x
-                if (!isEmpty(j, i, chessboard)) {
-                    if (getColor(chessboard[i][j]) != color) {
-                        int[] piece = chessboard[i][j];
-                        int pieceType = getPieceType(piece);
-                        if (pieceType == KING) {
-                            //skip the king
-                            continue;
-                        }
-                        Move move = new Move(j, i, x, y, piece);
-                        //for each piece call the static isValidMove method in their respective classes
-                        switch (pieceType) {
-                            case PAWN -> {
-                                if (Pawn.isValidCapture(move, chessboard, j, i, color)) {
-                                    return true;
-                                }
-                            }
-                            case KNIGHT -> {
-                                if (Knight.isValidMove(move, chessboard, j, i, color)) {
-                                    return true;
-                                }
-                            }
-                            case BISHOP -> {
-                                if (Bishop.isValidMove(move, chessboard, j, i, color)) {
-                                    return true;
-                                }
-                            }
-                            case ROOK -> {
-                                if (Rook.isValidMove(move, chessboard, j, i, color)) {
-                                    return true;
-                                }
-                            }
-                            case QUEEN -> {
-                                if (Queen.isValidMove(move, chessboard, j, i, color)) {
-                                    return true;
-                                }
-                            }
-                        }
+            if (rightsLong) {
+                //if the squares between the king and the rook are empty
+                if ((whitePieces & (1L << 57)) == 0 && (whitePieces & (1L << 58)) == 0 && (whitePieces & (1L << 59)) == 0) {
+                    //if the squares are not attacked by the opponent
+                    int firstSquareX = 3;
+                    int secondSquareX = 2;
+                    int thirdSquareX = 1;
+                    if (!moveGenerator.isAttacked(firstSquareX, 0, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 0, opponentColor) && !moveGenerator.isAttacked(thirdSquareX, 0, opponentColor)) {
+                        moves.add(new Move(x, y, 2, y, KING));
                     }
                 }
             }
         }
-        return false;
+        if (color == BLACK) {
+            if (rightsShort) {
+                //if the squares between the king and the rook are empty
+                if ((blackPieces & (1L << 5)) == 0 && (blackPieces & (1L << 6)) == 0) {
+                    //if the squares are not attacked by the opponent
+                    int firstSquareX = 5;
+                    int secondSquareX = 6;
+                    if (!moveGenerator.isAttacked(firstSquareX, 7, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 7, opponentColor)) {
+                        moves.add(new Move(x, y, 6, y, KING));
+                    }
+                }
+            }
+            if (rightsLong) {
+                //if the squares between the king and the rook are empty
+                if ((blackPieces & (1L << 1)) == 0 && (blackPieces & (1L << 2)) == 0 && (blackPieces & (1L << 3)) == 0) {
+                    //if the squares are not attacked by the opponent
+                    int firstSquareX = 3;
+                    int secondSquareX = 2;
+                    int thirdSquareX = 1;
+                    if (!moveGenerator.isAttacked(firstSquareX, 7, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 7, opponentColor) && !moveGenerator.isAttacked(thirdSquareX, 7, opponentColor)) {
+                        moves.add(new Move(x, y, 2, y, KING));
+                    }
+                }
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@ public class HumanPlayer extends Player {
     }
 
     @Override
-    public void awaitMove(int[][][] boardState, int color, MoveGenerator moveGenerator) {
+    public void awaitMove(int color, MoveGenerator moveGenerator) {
         //do nothing, because the move will be made by the user
     }
 

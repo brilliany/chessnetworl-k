@@ -1,3 +1,4 @@
+/*
 package Neuralnetwork;
 
 import ChessNetwork.MoveGenerator;
@@ -143,9 +144,13 @@ public class ChessNeuralNetwork {
             // Alternate between the two networks, check their color to determine which network is playing
             NeuralNetwork currentNetwork;
             if (moveNumber % 2 == 0) {
-                currentNetwork = /*which network is white*/ network1.getColor() == WHITE ? network1 : network2;
+                currentNetwork = */
+/*which network is white*//*
+ network1.getColor() == WHITE ? network1 : network2;
             } else {
-                currentNetwork = /*which network is black*/ network1.getColor() == BLACK ? network1 : network2;
+                currentNetwork = */
+/*which network is black*//*
+ network1.getColor() == BLACK ? network1 : network2;
             }
             int[] move = getMove(moveGenerator, currentNetwork);
 
@@ -298,4 +303,4 @@ public class ChessNeuralNetwork {
         }
         return bestNetworks;
     }
-}
+}*/

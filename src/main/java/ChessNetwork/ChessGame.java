@@ -6,7 +6,7 @@ import ChessNetwork.Game.Player;
 import java.util.ArrayList;
 import java.util.List;
 
-import static ChessNetwork.ChessboardHelper.getColor;
+import static ChessNetwork.ChessboardHelper.*;
 
 public class ChessGame {
     private final MoveGenerator moveGenerator;
@@ -33,47 +33,37 @@ public class ChessGame {
     // use player.awaitMove() and then wait for moveGenerator.addMoveListener() to be called
         //there has to always be a human, so the human starts the game
         moveGenerator.addMoveListener(move -> {
-            if (gameEnded(moveGenerator.getChessboard(), getColor(move.getPiece()))) {
+            if (gameEnded()) {
                 System.out.println("Game ended");
                 return;
             }
-            System.out.println("New move: " + move);
-
             if (getColor(move.getPiece()) == player1.getColor()) {
-                player2.awaitMove(moveGenerator.getChessboard(), -1, moveGenerator);
+                player2.awaitMove(BLACK, moveGenerator);
             } else {
-                player1.awaitMove(moveGenerator.getChessboard(), 1, moveGenerator);
+                player1.awaitMove( WHITE, moveGenerator);
             }
         });
         System.out.println("Player 1: " + player1.getClass().getSimpleName());
         if (player1 instanceof HumanPlayer) {
-            player1.init(this, 1);
-            player2.init(this, -1);
-            player1.awaitMove(moveGenerator.getChessboard(), 1, moveGenerator);
+            player1.init(this, WHITE);
+            player2.init(this, BLACK);
+            player1.awaitMove(WHITE, moveGenerator);
         } else {
-            player1.init(this, 1);
-            player2.init(this, -1);
-            player2.awaitMove(moveGenerator.getChessboard(), -1, moveGenerator);
+            player1.init(this, WHITE);
+            player2.init(this, BLACK);
+            player2.awaitMove( BLACK, moveGenerator);
         }
     }
 
 
 
-    private boolean gameEnded(int[][][] boardState, int color) {
-        if (moveGenerator.isCheckmate(color, boardState)) {
-            if (color == 1) {
-                callGameEndListeners("checkmate", 1);
-            } else {
-                callGameEndListeners("checkmate", -1);
-            }
+    private boolean gameEnded() {
+        if (moveGenerator.isCheckmate(BLACK) || moveGenerator.isCheckmate(WHITE)) {
+            callGameEndListeners("checkmate", 1);
             return true;
         }
-        if (moveGenerator.isStalemate(color, boardState)) {
+        if (moveGenerator.isStalemate(BLACK) || moveGenerator.isStalemate(WHITE)) {
             callGameEndListeners("stalemate", 0);
-            return true;
-        }
-        if (moveGenerator.isInsufficientMaterial(color, boardState)) {
-            callGameEndListeners("draw", 0);
             return true;
         }
         return false;

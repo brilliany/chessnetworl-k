@@ -6,11 +6,11 @@ public class Move {
     private final int newX;
     private final int newY;
 
-    private int[] piece;
+    private int piece;
     private boolean castle;
     private boolean capture;
 
-    public Move(int x, int y, int newX, int newY, int[] piece) {
+    public Move(int x, int y, int newX, int newY, int piece) {
         // Check if the move is out of bounds
 
         this.piece = piece;
@@ -43,10 +43,10 @@ public class Move {
     public boolean isCastle() {
         return castle;
     }
-    public int[] getPiece() {
+    public int getPiece() {
         return piece;
     }
-    public void setPiece(int[] piece) {
+    public void setPiece(int piece) {
         this.piece = piece;
     }
 

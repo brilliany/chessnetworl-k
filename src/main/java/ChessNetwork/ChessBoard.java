@@ -5,9 +5,8 @@ import ChessNetwork.Game.BotPlayer;
 import ChessNetwork.Game.HumanPlayer;
 import ChessNetwork.Game.NeuralNetworkPlayer;
 import ChessNetwork.Game.Player;
-import ChessNetwork.Pieces.Move;
+import ChessNetwork.Pieces.*;
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -19,12 +18,11 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import lombok.Getter;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static ChessNetwork.ChessboardHelper.*;
+import static java.lang.Math.abs;
 
 public class ChessBoard extends Application {
     private final int DEPTH = 7;
@@ -140,44 +138,34 @@ public class ChessBoard extends Application {
         if (winner != 0) {
             //find the winner king and color it green
             int kingColor = winner == WHITE ? WHITE : BLACK;
-            for (int i = 0; i < 8; i++) {
-                for (int j = 0; j < 8; j++) {
-                    if (moveGenerator.getChessboard()[i][j] != null &&
-                        getPieceType(moveGenerator.getChessboard()[i][j]) == KING &&
-                        getColor(moveGenerator.getChessboard()[i][j]) == kingColor) {
-                        Rectangle square = (Rectangle) getNodeByRowColumnIndex(i, j, board);
-                        if (square != null) {
-                            square.setFill(Color.GREEN);
-                        }
-                    }
-                }
+            if (kingColor == WHITE) {
+                long whiteKings = moveGenerator.getWhiteKings();
+                int kingIndex = Long.numberOfTrailingZeros(whiteKings);
+                int kingRow = kingIndex / 8;
+                int kingCol = kingIndex % 8;
+                Rectangle square = (Rectangle) getNodeByRowColumnIndex(kingRow, kingCol, board);
+                square.setFill(Color.GREEN);
+            } else {
+                long blackKings = moveGenerator.getBlackKings();
+                int kingIndex = Long.numberOfTrailingZeros(blackKings);
+                int kingRow = kingIndex / 8;
+                int kingCol = kingIndex % 8;
+                Rectangle square = (Rectangle) getNodeByRowColumnIndex(kingRow, kingCol, board);
+                square.setFill(Color.GREEN);
             }
+            System.out.println(message);
         }
-        //find the losers king and color it red
-        int kingColor = winner == WHITE ? BLACK : WHITE;
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                if (moveGenerator.getChessboard()[i][j] != null &&
-                    getPieceType(moveGenerator.getChessboard()[i][j]) == KING &&
-                    getColor(moveGenerator.getChessboard()[i][j]) == kingColor) {
-                    Rectangle square = (Rectangle) getNodeByRowColumnIndex(i, j, board);
-                    if (square != null) {
-                        square.setFill(Color.RED);
-                    }
-                }
-            }
-        }
+
     }
 
-    private Object getNodeByRowColumnIndex(int i, int j, GridPane board) {
+    private Object getNodeByRowColumnIndex(int kingRow, int kingCol, GridPane board) {
         for (Node node : board.getChildren()) {
-            if (GridPane.getRowIndex(node) == i && GridPane.getColumnIndex(node) == j) {
+            if (GridPane.getRowIndex(node) == kingRow && GridPane.getColumnIndex(node) == kingCol) {
                 return node;
             }
         }
         return null;
     }
-
 
     private void viewGame(Button viewGameButton, MoveGenerator moveGenerator) {
         viewGameButton.setOnAction(event -> {
@@ -208,47 +196,53 @@ public class ChessBoard extends Application {
 
 
     private void addPiecesToBoard(MoveGenerator moveGenerator) {
-        int[][][] boardState = moveGenerator.getChessboard();
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                int[] piece = boardState[i][j];
-                String pieceName = getPieceTypeAsStr(piece).toLowerCase();
-                if (piece== EMPTY_SQUARE) {
+        // Add the pieces to the board
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                // Add the pieces to the board
+                int pieceType = moveGenerator.getPieceType(col, row);
+                String piece = getPieceTypeAsStr(pieceType).toLowerCase();
+                System.out.println(piece);
+                if (piece.equals("empty")) {
                     continue;
                 }
-                String color = getColor(piece) == WHITE ? "white" : "black";
-                String fileName = "src/main/resources/Pieces/" + color + "_" + pieceName + ".png";
-                File file = new File(fileName);
-                Image image = new Image(file.toURI().toString());
-                ImageView imageView = new ImageView(image);
+                ImageView imageView = new ImageView();
                 imageView.setFitHeight(50);
                 imageView.setFitWidth(50);
-                board.add(imageView, j, i);
-                handlePieceClick(imageView, j, i, moveGenerator);
+                imageView.setImage(new Image("pieces/" + piece + ".png"));
+                board.add(imageView, col, row);
+                handlePieceClick(imageView, col, row, moveGenerator, pieceType);
             }
         }
     }
 
-    void handlePieceClick(ImageView imageView, int x, int y, MoveGenerator moveGenerator) {
+    void handlePieceClick(ImageView imageView, int x, int y, MoveGenerator moveGenerator, int pieceType) {
         imageView.setOnMouseClicked(event -> {
-            final int[] piece = moveGenerator.getChessboard()[y][x];
-            System.out.println("Clicked on " + getPieceTypeAsStr(piece) + " at " + x + ", " + y);
-            Move[] moves = getPieceMoves(piece, x, y, moveGenerator.getChessboard(), moveGenerator);
-            System.out.println("Moves: " + Arrays.toString(moves));
-            for (Move move : moves) {
+            System.out.println("Clicked on " + x + " " + y);
+            Move[] movesToHighlight = getMovesToHighlight(moveGenerator, x, y, pieceType);
+            for (Move move : movesToHighlight) {
                 int row = move.getToY();
                 int col = move.getToX();
-                //highlight the squares
-                Rectangle square = new Rectangle(50, 50);
-                square.setFill(Color.GREEN);
-                board.add(square, col, row);
-                square.setOnMouseClicked(event1 -> {
-                    // try to move the piece
-                    moveGenerator.makeMove(move, moveGenerator.getChessboard());
-                    updateChessBoard(moveGenerator);
-                });
+                Rectangle square = (Rectangle) getNodeByRowColumnIndex(row, col, board);
+                if (square != null) {
+                    square.setFill(Color.GREEN);
+                }
             }
         });
+    }
+
+    private Move[] getMovesToHighlight(MoveGenerator moveGenerator, int x, int y, int pieceType) {
+        int color = pieceType > 0 ? WHITE : BLACK;
+        int piece = abs(pieceType);
+        return switch (piece) {
+            case PAWN -> Pawn.getMoves(x, y, color, moveGenerator);
+            case KNIGHT -> Knight.getMoves(x, y, color, moveGenerator);
+            case BISHOP -> Bishop.getMoves(x, y, color, moveGenerator);
+            case ROOK -> Rook.getMoves(x, y, color, moveGenerator);
+            case QUEEN -> Queen.getMoves(x, y, color, moveGenerator);
+            case KING -> King.getMoves(x, y, color, moveGenerator);
+            default -> new Move[0];
+        };
     }
 
     private void unhighlight() {
@@ -265,10 +259,9 @@ public class ChessBoard extends Application {
 
     private void updateChessBoard(MoveGenerator moveGenerator) {
         //use the queue to update the board without producing concurrent modification exception
-          Platform.runLater(() -> {
                 unhighlight();
                 board.getChildren().removeIf(node -> node instanceof ImageView);
                 addPiecesToBoard(moveGenerator);
-            });
+
     }
 }

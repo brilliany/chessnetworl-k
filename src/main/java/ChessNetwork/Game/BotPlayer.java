@@ -13,15 +13,15 @@ public class BotPlayer extends Player {
         this.bot = new ChessBot.ChessBot(depth, pieceTables, color, moveGenerator);
     }
 
-    public Move getMove(int[][][] boardState, int color, MoveGenerator moveGenerator) {
-        return bot.getBestMove(/*color, moveGenerator*/);
+    public Move getMove(int color, MoveGenerator moveGenerator) {
+        return bot.getBestMove();
     }
 
     @Override
-    public void awaitMove(int[][][] boardState, int color, MoveGenerator moveGenerator) {
+    public void awaitMove(int color, MoveGenerator moveGenerator) {
         //call listener with the move
-        Move move = getMove(boardState, color, moveGenerator);
-        moveGenerator.makeMove(move, boardState);
+        Move move = getMove(color, moveGenerator);
+        moveGenerator.makeMove(move);
     }
 
 

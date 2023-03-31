@@ -11,7 +11,7 @@ public abstract class Player {
         return color;
     }
 
-    public abstract void awaitMove(int[][][] boardState, int color, MoveGenerator moveGenerator);
+    public abstract void awaitMove(int color, MoveGenerator moveGenerator);
 
     public abstract void init(ChessGame chessGame, int color);
 }

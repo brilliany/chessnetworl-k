@@ -1,12 +1,7 @@
 package ChessBot;
 
-import ChessNetwork.ChessboardHelper;
 import ChessNetwork.MoveGenerator;
 import ChessNetwork.Pieces.Move;
-
-import java.util.*;
-
-import static ChessNetwork.ChessboardHelper.*;
 
 public class ChessBot {
 
@@ -53,31 +48,23 @@ public class ChessBot {
     private int confidence;
     private Move bestMove;
 
-    private Map<String, TranspositionEntry> transpositionTable;
+//    private Map<String, TranspositionEntry> transpositionTable;
 
     public ChessBot(int depth, PieceTables pieceTables, int color, MoveGenerator moveGenerator) {
         this.depth = depth;
         this.pieceTables = pieceTables;
-        this.transpositionTable = new HashMap<>();
+//        this.transpositionTable = new HashMap<>();
         this.color = color;
         this.moveGenerator = moveGenerator;
-        this.currentPosition = ChessboardHelper.copyChessboard(moveGenerator.getChessboard());
-
-        // add a move listener to move generator
-        moveGenerator.addMoveListener(move -> {
-            // ignore bot moves
-            currentPosition = ChessboardHelper.copyChessboard(ChessboardHelper.makeMoveSilent(move,currentPosition));
-            startSearch();
-        });
-
-        // start the initial search
-        startSearch();
     }
-
+/*
     private void startSearch() {
         //for each of the opponent's moves, start alpha beta search, then when the opponent's move is made, choose the best move from the list of moves that were searched
 
         int howDeepWeRn = 0;
+        long[] currentPosition = new long[6];
+        currentPosition == moveGenerator.getWhitePawns()
+
 
         // start iterative deepening if depth hasn't been reached
         if (howDeepWeRn < depth) {
@@ -92,30 +79,31 @@ public class ChessBot {
                     bestMove = result.move;
                 }
                 System.out.println("Depth: " + i + " Score: " + result.score + " Best move: " + result.move);
-                confidence = /*percentage of depth completed*/ (int) (((double) i / depth) * 100);
+                confidence = *//*percentage of depth completed*//* (int) (((double) i / depth) * 100);
                 howDeepWeRn++;
             }
         }
     }
-
+*/
     public Move getBestMove() {
-        //wait until confidence is high enough
-        while (confidence < 80) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        System.out.println("Confidence: " + confidence + "%");
-        return bestMove;
+//        startSearch();
+//        //wait until confidence is over 80%
+//        while (confidence < 80) {
+//            try {
+//                Thread.sleep(100);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        return bestMove;
+        return null;
     }
-
-    private Result alphaBeta(int[][][] chessboard, int depth, int alpha, int beta, int color, boolean maximizingPlayer, Map<String, TranspositionEntry> transpositionTable) {
+/*
+    private Result alphaBeta(int depth, int alpha, int beta, int color, boolean maximizingPlayer, Map<String, TranspositionEntry> transpositionTable) {
         amountOfBranches++;
-        String boardString = ChessboardHelper.boardToString(chessboard);
+        String boardString = boardToString(moveGenerator);
         TranspositionEntry transpositionEntry = transpositionTable.get(boardString);
-        int score = evaluate(chessboard, color);
+        int score = evaluate(color, moveGenerator);
 
         // handle transposition table check here
         if (transpositionEntry != null) {
@@ -142,7 +130,7 @@ public class ChessBot {
         }
         int bestScore;
         Move best;
-        Move[] moves = moveGenerator.getAllMoves(color, chessboard);
+        List<Move> moves = moveGenerator.getAllMoves(color);
         //order moves based on evaluation
 //        Arrays.sort(moves, (o1, o2) -> {
 //            int[][][] newBoard = ChessboardHelper.copyChessboard(chessboard);
@@ -155,11 +143,10 @@ public class ChessBot {
 //        });
         if (maximizingPlayer) {
             bestScore = MIN_SCORE;
-            best = new Move(-1, -1, -1, -1, EMPTY_SQUARE);
+            best = new Move(-1, -1, -1, -1, EMPTY);
             for (Move move : moves) {
-// make the move
-                int[][][] newBoard = ChessboardHelper.copyChessboard(chessboard);
-                ChessboardHelper.makeMoveSilent(move, newBoard);
+
+                moveGenerator.makeMoveSilent(move);
 
                 Result result = alphaBeta(newBoard, depth - 1, alpha, beta, -color, false, transpositionTable);
 // check if we found a better move
@@ -337,4 +324,9 @@ public class ChessBot {
             this.move = move;
         }
     }
+    public static String boardToString(MoveGenerator moveGenerator) {
+        // Returns a string representation of the board
+        // This is used for saving positions
+
+    }*/
 }
