@@ -4,7 +4,7 @@ import ChessNetwork.Game.BotPlayer;
 import ChessNetwork.Game.HumanPlayer;
 import ChessNetwork.Game.NeuralNetworkPlayer;
 import ChessNetwork.Game.Player;
-import ChessNetwork.Pieces.*;
+import ChessNetwork.Pieces.Move;
 import javafx.application.Application;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static ChessNetwork.BoardUtils.*;
-import static java.lang.Math.abs;
 
 public class ChessUI extends Application {
 
@@ -210,6 +209,7 @@ public class ChessUI extends Application {
                 int finalRow = row;
                 imageView.setOnMouseClicked(event -> {
                     ArrayList<Move> movesToHighlight = getMovesToHighlight(finalCol, finalRow, pieceType, chessboard);
+                    unhighlight();
                     for (Move move : movesToHighlight) {
                         Rectangle square = (Rectangle) getNodeByRowColumnIndex(move.getToY(), move.getToX() , board);
                         if (square != null) {
@@ -230,18 +230,9 @@ public class ChessUI extends Application {
         }
     }
     private ArrayList<Move> getMovesToHighlight(int x, int y, int pieceType, Chessboard chessboard) {
-        System.out.println("getMovesToHighlight for " + x + " " + y + " " + pieceType);
-        int color = pieceType > 0 ? WHITE : BLACK;
-        int piece = abs(pieceType);
-        return switch (piece) {
-            case PAWN -> Pawn.getMoves(x, y, color, chessboard);
-            case KNIGHT -> Knight.getMoves(x, y, color, chessboard);
-            case BISHOP -> Bishop.getMoves(x, y, color, chessboard);
-            case ROOK -> Rook.getMoves(x, y, color, chessboard);
-            case QUEEN -> Queen.getMoves(x, y, color, chessboard);
-            case KING -> King.getMoves(x, y, color, chessboard);
-            default -> new ArrayList<>();
-        };
+        List<Move> allmoves = MoveGenerator.getAllMoves((pieceType > 0 ? WHITE : BLACK),chessboard);
+        allmoves.removeIf(move -> move.getFromX() != x || move.getFromY() != y);
+        return new ArrayList<>(allmoves);
     }
 
     private void unhighlight() {

@@ -12,7 +12,7 @@ public class MoveGenerator {
 
 
     public static List<Move> getAllMoves(int color, Chessboard chessboard) {
-        List<Move> allMoves = new ArrayList<>();
+        ArrayList<Move> allMoves = new ArrayList<>();
 
         long pieces = color == WHITE ? chessboard.getWhitePieces() : chessboard.getBlackPieces();
         long pawns = color == WHITE ? chessboard.getWhitePawns() : chessboard.getBlackPawns();
@@ -29,32 +29,24 @@ public class MoveGenerator {
             pieces ^= piece;
 
             int fromSquare = Long.numberOfTrailingZeros(piece);
-            ArrayList<Move> moves = null;
             // Get moves for the current piece type
             if ((pawns & piece) != 0) {
-                moves = Pawn.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                Pawn.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             } else if ((knights & piece) != 0) {
-                moves = Knight.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                Knight.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             } else if ((bishops & piece) != 0) {
-                moves = Bishop.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                Bishop.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             } else if ((rooks & piece) != 0) {
-                moves = Rook.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                Rook.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             } else if ((queens & piece) != 0) {
-                moves = Queen.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                Queen.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             } else if ((kings & piece) != 0) {
-                moves = King.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard);
+                King.getMoves(fromSquare % 8, fromSquare / 8, color, chessboard, allMoves);
             }
-            if (moves != null) {
+            // if puts king in check, remove move
 
-                // if puts king in check, remove move
-                if (moves.size() != 0) {
-                    moves.removeIf(move -> MoveGenerator.putsKingInCheck(move, chessboard));
-                }
-                // Add the moves for the current piece to the list of all moves
-
-                allMoves.addAll(moves);
-            }
         }
+        allMoves.removeIf(move -> MoveGenerator.putsKingInCheck(move, chessboard));
         return allMoves;
     }
 
@@ -106,7 +98,7 @@ public class MoveGenerator {
         int kingX = Long.numberOfTrailingZeros(king) % 8;
         int kingY = Long.numberOfTrailingZeros(king) / 8;
 
-        return BoardUtils.isAttacked(kingX, kingY, -color, chessboard);
+        return BoardUtils.isAttacked(kingX, kingY, color, chessboard);
 
     }
 

@@ -10,15 +10,14 @@ public class Pawn {
 
 
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard chessboard) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard chessboard, ArrayList<Move> moves) {
         //Color is 1 for white and -1 for black, so we can use it to determine the direction of the pawn
-        ArrayList<Move> moves = new ArrayList<>();
         //shift bitboard one and step in the direction of the pawn (*direction to get the right direction)
         int direction = -color;
         long oneStep = 1L << (x + (y + direction) * 8);
         long twoStep = 1L << (x + (y + direction * 2) * 8);
-        long captureLeft = 1L << (x - 1 + (y + direction) * 8);
-        long captureRight = 1L << (x + 1 + (y + direction) * 8);
+        long captureLeft = (x > 0) ? 1L << (x - 1 + (y + direction) * 8) : 0;
+        long captureRight = (x < 7) ? 1L << (x + 1 + (y + direction) * 8) : 0;
         //get if the move is blocked
         switch (color) {
             case WHITE -> {

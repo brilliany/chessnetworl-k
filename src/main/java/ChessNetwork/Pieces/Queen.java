@@ -9,8 +9,8 @@ import static ChessNetwork.BoardUtils.*;
 public class Queen {
 
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
-        ArrayList<Move> moves = new ArrayList<>();
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator, ArrayList<Move> moves) {
+
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 

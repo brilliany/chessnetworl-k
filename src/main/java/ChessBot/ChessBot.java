@@ -3,14 +3,13 @@ package ChessBot;
 import ChessNetwork.Chessboard;
 import ChessNetwork.Pieces.Move;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static ChessBot.BotHelper.getRawPieceValue;
 import static ChessBot.Heuristics.tables;
 import static ChessNetwork.BoardUtils.EMPTY;
+import static ChessNetwork.BoardUtils.WHITE;
 import static ChessNetwork.MoveGenerator.getAllMoves;
 
 public class ChessBot {
@@ -58,7 +57,7 @@ public class ChessBot {
         System.out.println("Time taken: " + (endTime - startTime) + "ms");
         System.out.println("Cut off branches: " + cutOffBranches);
         System.out.println("Amount of branches: " + amountOfBranches);
-        System.out.println("Percentage of branches cut off: " + ((double) cutOffBranches / amountOfBranches) * 100 + "%");
+        System.out.println("Percentage of branches cut off: " + Math.round((double) cutOffBranches / amountOfBranches * 100) + "%");
         System.out.println("Best score: " + bestScore);
         return bestMove;
     }
@@ -74,15 +73,15 @@ public class ChessBot {
             return new Result(MIN_SCORE, null);
         }
         //order moves based on evaluation
-        Arrays.sort(new List[]{moves}, (o1, o2) -> {
-            currentPosition.silentMove((Move) o1);
-            int score1 = evaluate(currentPosition, color);
-            currentPosition.restorePrevious();
-            currentPosition.silentMove((Move) o2);
-            int score2 = evaluate(currentPosition, color);
-            currentPosition.restorePrevious();
-            return score2 - score1;
-        });
+//        Arrays.sort(new List[]{moves}, (o1, o2) -> {
+//            currentPosition.silentMove((Move) o1);
+//            int score1 = evaluate(currentPosition, color);
+//            currentPosition.restorePrevious();
+//            currentPosition.silentMove((Move) o2);
+//            int score2 = evaluate(currentPosition, color);
+//            currentPosition.restorePrevious();
+//            return score2 - score1;
+//        });
 
         // handle transposition table check here
         if (transpositionEntry != null) {
@@ -173,30 +172,52 @@ public class ChessBot {
 
     public int evaluate(Chessboard chessboard, int color) {
         // Evaluate the position of the chessboard
-        // index 0-5 are white pieces, 6-11 are black pieces, pawn, knight, bishop, rook, queen, king
         int score = 0;
-        for (int i = 0; i < 12; i++) {
-            //count how many pieces in first bitboard
-            int pieceCount = Long.bitCount(chessboard.getWhitePieces() | chessboard.getBlackPieces());
-            //get the value of the piece, first 6 are white (so the piece is positive, 1 for pawn ect), last 6 are black
-            int pieceType = i < 6 ? i + 1 : (i - 5)*-1;
-            int pieceValue = getRawPieceValue(pieceType, color);
-            //add the value of the piece to the score
-            int score1 = pieceCount * pieceValue;
-
-            score += score1;
-        }
+        score += material(chessboard, color);
         score += heuristics(chessboard, color);
         score += tables(chessboard, color);
         return score;
     }
 
+    private int material(Chessboard chessboard, int color) {
+        // Loop through bitboards and count the number of pieces
+        int score = 0;
+        if (color == WHITE) {
+            score += Long.bitCount(chessboard.getWhitePawns()) * 10;
+            score += Long.bitCount(chessboard.getWhiteKnights()) * 29;
+            score += Long.bitCount(chessboard.getWhiteBishops()) * 30;
+            score += Long.bitCount(chessboard.getWhiteRooks()) * 50;
+            score += Long.bitCount(chessboard.getWhiteQueens()) * 90;
+            score += Long.bitCount(chessboard.getWhiteKings()) * 2000;
+            score -= Long.bitCount(chessboard.getBlackPawns()) * -100;
+            score -= Long.bitCount(chessboard.getBlackKnights()) * -29;
+            score -= Long.bitCount(chessboard.getBlackBishops()) * -30;
+            score -= Long.bitCount(chessboard.getBlackRooks()) * -50;
+            score -= Long.bitCount(chessboard.getBlackQueens()) * -90;
+            score -= Long.bitCount(chessboard.getBlackKings()) * -2000;
+        }
+        else {
+            score += Long.bitCount(chessboard.getWhitePawns()) * -100;
+            score += Long.bitCount(chessboard.getWhiteKnights()) * -29;
+            score += Long.bitCount(chessboard.getWhiteBishops()) * -30;
+            score += Long.bitCount(chessboard.getWhiteRooks()) * -50;
+            score += Long.bitCount(chessboard.getWhiteQueens()) * -90;
+            score += Long.bitCount(chessboard.getWhiteKings()) * -2000;
+            score -= Long.bitCount(chessboard.getBlackPawns()) * 10;
+            score -= Long.bitCount(chessboard.getBlackKnights()) * 29;
+            score -= Long.bitCount(chessboard.getBlackBishops()) * 30;
+            score -= Long.bitCount(chessboard.getBlackRooks()) * 50;
+            score -= Long.bitCount(chessboard.getBlackQueens()) * 90;
+            score -= Long.bitCount(chessboard.getBlackKings()) * 2000;
+        }
+        return score * color;
+    }
 
 
     private int heuristics(Chessboard chessboard, int color) {
         // A heuristic to evaluate the position of the chessboard
         //bitboards (color dependent, -1 for black, 1 for white)
-        Heuristics heuristics = new Heuristics(getPositionFromChessboard(chessboard), color);
+        Heuristics heuristics = new Heuristics(chessboard, color);
         int score = 0;
         //material score is already calculated in the evaluate function
 

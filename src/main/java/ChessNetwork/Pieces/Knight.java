@@ -9,7 +9,7 @@ import static ChessNetwork.BoardUtils.WHITE;
 
 public class Knight {
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
+    public static void getMoves(int x, int y, int color, Chessboard moveGenerator, ArrayList<Move> moves) {
         long[] squares = {
                 1L << (x + 2 + (y + 1) * 8),
                 1L << (x + 2 + (y - 1) * 8),
@@ -20,7 +20,6 @@ public class Knight {
                 1L << (x - 1 + (y + 2) * 8),
                 1L << (x - 1 + (y - 2) * 8)
         };
-        ArrayList<Move> moves = new ArrayList<>();
         for (long square : squares) {
             long pieces = color == WHITE ? moveGenerator.getWhitePieces() : moveGenerator.getBlackPieces();
             long opponentPieces = color == WHITE ? moveGenerator.getBlackPieces() : moveGenerator.getWhitePieces();
@@ -37,6 +36,5 @@ public class Knight {
             }
         }
 
-        return moves;
     }
 }

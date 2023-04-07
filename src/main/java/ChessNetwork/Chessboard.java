@@ -215,6 +215,7 @@ public class Chessboard {
             callMoveListeners(move);
             return;
         }
+        System.out.println("Making move: " + move.getFromX() + "," + move.getFromY() + " to " + move.getToX() + "," + move.getToY() + " with piece " + move.getPiece());
         move(move);
         callMoveListeners(move);
     }
@@ -270,41 +271,108 @@ public class Chessboard {
         }
 
         // Handle promotion
-        if (piece == WHITE * PAWN && newY == 7) {
+        if (piece == WHITE * PAWN && newY == 0) {
             // Promote white pawn to queen
             whitePawns &= ~(1L << y * 8 + x);
             whiteQueens |= (1L << newY * 8 + newX);
             whitePieces &= ~(1L << y * 8 + x);
             whitePieces |= (1L << newY * 8 + newX);
-        } else if (piece == BLACK * PAWN && newY == 0) {
+        } else if (piece == BLACK * PAWN && newY == 7) {
             // Promote black pawn to queen
             blackPawns &= ~(1L << y * 8 + x);
             blackQueens |= (1L << newY * 8 + newX);
-            blackPieces
-                    &= ~(1L << y * 8 + x);
+            blackPieces &= ~(1L << y * 8 + x);
             blackPieces |= (1L << newY * 8 + newX);
         } else {
-// Update the bitboards to reflect the move
+// Update the bitboards to reflect the move and capture
             if ((whitePawns & (1L << y * 8 + x)) != 0) {
                 whitePawns &= ~(1L << y * 8 + x);
                 whitePawns |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((whiteKnights & (1L << y * 8 + x)) != 0) {
                 whiteKnights &= ~(1L << y * 8 + x);
                 whiteKnights |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((whiteBishops & (1L << y * 8 + x)) != 0) {
                 whiteBishops &= ~(1L << y * 8 + x);
                 whiteBishops |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((whiteRooks & (1L << y * 8 + x)) != 0) {
                 whiteRooks &= ~(1L << y * 8 + x);
                 whiteRooks |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
                 if (x == 0) {
                     setCastleRights(WHITE, QUEEN_SIDE, false);
                 } else if (x == 7) {
@@ -315,6 +383,23 @@ public class Chessboard {
                 whiteQueens |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((whiteKings & (1L << y * 8 + x)) != 0) {
                 whiteKings &= ~(1L << y * 8 + x);
                 whiteKings |= (1L << newY * 8 + newX);
@@ -335,6 +420,23 @@ public class Chessboard {
                         whitePieces |= (1L << 3);
                     }
                 }
+                if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing black piece
+                    blackPieces &= ~(1L << newY * 8 + newX);
+                    if ((blackPawns & (1L << newY * 8 + newX)) != 0) {
+                        blackPawns &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKnights & (1L << newY * 8 + newX)) != 0) {
+                        blackKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((blackBishops & (1L << newY * 8 + newX)) != 0) {
+                        blackBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((blackRooks & (1L << newY * 8 + newX)) != 0) {
+                        blackRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((blackQueens & (1L << newY * 8 + newX)) != 0) {
+                        blackQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((blackKings & (1L << newY * 8 + newX)) != 0) {
+                        blackKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
                 setCastleRights(WHITE, QUEEN_SIDE, false);
                 setCastleRights(WHITE, KING_SIDE, false);
             } else if ((blackPawns & (1L << y * 8 + x)) != 0) {
@@ -342,21 +444,89 @@ public class Chessboard {
                 blackPawns |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((blackKnights & (1L << y * 8 + x)) != 0) {
                 blackKnights &= ~(1L << y * 8 + x);
                 blackKnights |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((blackBishops & (1L << y * 8 + x)) != 0) {
                 blackBishops &= ~(1L << y * 8 + x);
                 blackBishops |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((blackRooks & (1L << y * 8 + x)) != 0) {
                 blackRooks &= ~(1L << y * 8 + x);
                 blackRooks |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
                 if (x == 0) {
                     setCastleRights(BLACK, QUEEN_SIDE, false);
                 } else if (x == 7) {
@@ -367,6 +537,23 @@ public class Chessboard {
                 blackQueens |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
+                    }
+                }
             } else if ((blackKings & (1L << y * 8 + x)) != 0) {
                 blackKings &= ~(1L << y * 8 + x);
                 blackKings |= (1L << newY * 8 + newX);
@@ -385,6 +572,23 @@ public class Chessboard {
                         blackRooks |= (1L << 3);
                         blackPieces &= ~(1L << 0);
                         blackPieces |= (1L << 3);
+                    }
+                }
+                if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
+                    // Capturing white piece
+                    whitePieces &= ~(1L << newY * 8 + newX);
+                    if ((whitePawns & (1L << newY * 8 + newX)) != 0) {
+                        whitePawns &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKnights & (1L << newY * 8 + newX)) != 0) {
+                        whiteKnights &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteBishops & (1L << newY * 8 + newX)) != 0) {
+                        whiteBishops &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteRooks & (1L << newY * 8 + newX)) != 0) {
+                        whiteRooks &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteQueens & (1L << newY * 8 + newX)) != 0) {
+                        whiteQueens &= ~(1L << newY * 8 + newX);
+                    } else if ((whiteKings & (1L << newY * 8 + newX)) != 0) {
+                        whiteKings &= ~(1L << newY * 8 + newX);
                     }
                 }
                 setCastleRights(BLACK, QUEEN_SIDE, false);

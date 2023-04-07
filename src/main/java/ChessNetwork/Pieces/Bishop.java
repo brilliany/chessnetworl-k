@@ -11,9 +11,9 @@ import static ChessNetwork.BoardUtils.addMovesInDirection;
 public class Bishop {
 
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
+    public static void getMoves(int x, int y, int color, Chessboard moveGenerator, ArrayList<Move> moves) {
         // The coordinates start from the top left corner (y = 0, x = 0), y is the vertical axis and x is the horizontal axis
-        ArrayList<Move> moves = new ArrayList<>();
+
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 
@@ -26,6 +26,5 @@ public class Bishop {
         // down left
         addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 1,BISHOP*color);
 
-        return moves;
     }
 }

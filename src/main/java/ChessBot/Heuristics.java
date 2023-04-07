@@ -28,22 +28,23 @@ public class Heuristics {
     private static final int ISOLATED_PAWN_WEIGHT = -1;
     private static final int DOUBLED_PAWN_WEIGHT = -1;
 
-    public Heuristics(long[] pieceBitboards, int color) {
+    public Heuristics(Chessboard chessboard, int color) {
         this.color = color;
 
-        whitePawns = pieceBitboards[0];
-        whiteKnights = pieceBitboards[1];
-        whiteBishops = pieceBitboards[2];
-        whiteRooks = pieceBitboards[3];
-        whiteQueens = pieceBitboards[4];
-        whiteKing = pieceBitboards[5];
+        whitePawns = chessboard.getWhitePawns();
+        whiteKnights = chessboard.getWhiteKnights();
+        whiteBishops = chessboard.getWhiteBishops();
+        whiteRooks = chessboard.getWhiteRooks();
+        whiteQueens = chessboard.getWhiteQueens();
+        whiteKing = chessboard.getWhiteKings();
 
-        blackPawns = pieceBitboards[6];
-        blackKnights = pieceBitboards[7];
-        blackBishops = pieceBitboards[8];
-        blackRooks = pieceBitboards[9];
-        blackQueens = pieceBitboards[10];
-        blackKing = pieceBitboards[11];
+        blackPawns = chessboard.getBlackPawns();
+        blackKnights = chessboard.getBlackKnights();
+        blackBishops = chessboard.getBlackBishops();
+        blackRooks = chessboard.getBlackRooks();
+        blackQueens = chessboard.getBlackQueens();
+        blackKing = chessboard.getBlackKings();
+
     }
 
     int twoMiddlePawns() {
@@ -62,39 +63,39 @@ public class Heuristics {
         //add score for each piece not in starting position, score for own color 1, for opponent color -1,
         int score = 0;
         //white pieces score
-        int wKs = Long.bitCount(whiteKnights & ~((1L << 1) | (1L << 6))) * DEVELOPMENT_WEIGHT;
-        int wBs = Long.bitCount(whiteBishops & ~((1L << 2) | (1L << 5)));
-        int wRs = Long.bitCount(whiteRooks & ~((1L << 0) | (1L << 7)));
-        int wQs = Long.bitCount(whiteQueens & ~(1L << 3)) * DEVELOPMENT_WEIGHT;
+        int wKs = Long.bitCount(whiteKnights & ~((1L << 57) | (1L << 62)));
+        int wBs = Long.bitCount(whiteBishops & ~((1L << 58) | (1L << 61)));
+        int wRs = Long.bitCount(whiteRooks & ~((1L << 56) | (1L << 63)));
+        int wQs = Long.bitCount(whiteQueens & ~(1L << 59));
         //black pieces score
         int bKs = Long.bitCount(blackKnights & ~((1L << 1) | (1L << 6)));
         int bBs = Long.bitCount(blackBishops & ~((1L << 2) | (1L << 5)));
         int bRs = Long.bitCount(blackRooks & ~((1L << 0) | (1L << 7)));
-        int bQs = Long.bitCount(blackQueens & ~(1L << 3)) * DEVELOPMENT_WEIGHT;
+        int bQs = Long.bitCount(blackQueens & ~(1L << 3));
         if (color == WHITE) {
             // add score for own pieces
-            score += wKs;
+            score += wKs * DEVELOPMENT_WEIGHT;
             score += wBs * DEVELOPMENT_WEIGHT;
             score += wRs * DEVELOPMENT_WEIGHT;
-            score += wQs;
+            score += wQs * DEVELOPMENT_WEIGHT;
 
             // subtract score for opponent pieces
             score -= bKs * DEVELOPMENT_WEIGHT;
             score -= bBs * DEVELOPMENT_WEIGHT;
             score -= bRs * DEVELOPMENT_WEIGHT;
-            score -= bQs;
+            score -= bQs * DEVELOPMENT_WEIGHT;
         } else {
             // add score for own pieces
-            score -= wKs;
+            score -= wKs * DEVELOPMENT_WEIGHT;
             score -= wBs * DEVELOPMENT_WEIGHT;
             score -= wRs * DEVELOPMENT_WEIGHT;
-            score -= wQs;
+            score -= wQs * DEVELOPMENT_WEIGHT;
 
             // subtract score for opponent pieces
             score += bKs * DEVELOPMENT_WEIGHT;
             score += bBs * DEVELOPMENT_WEIGHT;
             score += bRs * DEVELOPMENT_WEIGHT;
-            score += bQs;
+            score += bQs * DEVELOPMENT_WEIGHT;
         }
         return score;
     }

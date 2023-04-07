@@ -11,9 +11,8 @@ import static ChessNetwork.BoardUtils.*;
 
 public class King {
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
+    public static void getMoves(int x, int y, int color, Chessboard moveGenerator, ArrayList<Move> moves) {
 
-        ArrayList<Move> moves = new ArrayList<>();
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 
@@ -53,7 +52,6 @@ public class King {
         // castling
         handleCastling(moves, x, y, color, moveGenerator);
 
-        return moves;
     }
 
     private static void handleCastling(ArrayList<Move> moves, int x, int y, int color, Chessboard chessboard) {
@@ -62,6 +60,7 @@ public class King {
         }
         boolean rightsShort = chessboard.getCastleRights(color, 1);
         boolean rightsLong = chessboard.getCastleRights(color, 0);
+
         long whitePieces = chessboard.getWhitePieces();
         long blackPieces = chessboard.getBlackPieces();
         int opponentColor = color == WHITE ? BLACK : WHITE;

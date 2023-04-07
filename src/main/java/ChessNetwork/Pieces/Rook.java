@@ -8,9 +8,8 @@ import static ChessNetwork.BoardUtils.*;
 
 public class Rook {
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator, ArrayList<Move> moves) {
 
-        ArrayList<Move> moves = new ArrayList<>();
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 

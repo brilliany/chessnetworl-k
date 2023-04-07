@@ -94,12 +94,12 @@ public class BoardUtils {
         }
     }
     public static boolean isAttacked(int x, int y, int color, Chessboard chessboard) {
-        long opponentPawns = color == BLACK ? chessboard.getBlackPawns() : chessboard.getWhitePawns();
-        long opponentKnights = color == BLACK ? chessboard.getBlackKnights() : chessboard.getWhiteKnights();
-        long opponentBishops = color == BLACK ? chessboard.getBlackBishops() : chessboard.getWhiteBishops();
-        long opponentRooks = color == BLACK ? chessboard.getBlackRooks() : chessboard.getWhiteRooks();
-        long opponentQueens = color == BLACK ? chessboard.getBlackQueens() : chessboard.getWhiteQueens();
-        long opponentKings = color == BLACK ? chessboard.getBlackKings() : chessboard.getWhiteKings();
+        long opponentPawns = color == BLACK ? chessboard.getWhitePawns() : chessboard.getBlackPawns();
+        long opponentKnights = color == BLACK ? chessboard.getWhiteKnights() : chessboard.getBlackKnights();
+        long opponentBishops = color == BLACK ? chessboard.getWhiteBishops() : chessboard.getBlackBishops();
+        long opponentRooks = color == BLACK ? chessboard.getWhiteRooks() : chessboard.getBlackRooks();
+        long opponentQueens = color == BLACK ? chessboard.getWhiteQueens() : chessboard.getBlackQueens();
+        long opponentKings = color == BLACK ? chessboard.getWhiteKings() : chessboard.getBlackKings();
 
         if (isAttackedByPawn(x, y, color == BLACK, opponentPawns)) {
             return true;
