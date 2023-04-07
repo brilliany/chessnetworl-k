@@ -1,7 +1,7 @@
 package ChessNetwork.Game;
 
 import ChessNetwork.ChessGame;
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 
 public class HumanPlayer extends Player {
 
@@ -10,7 +10,7 @@ public class HumanPlayer extends Player {
     }
 
     @Override
-    public void awaitMove(int color, MoveGenerator moveGenerator) {
+    public void awaitMove(int color, Chessboard chessboard) {
         //do nothing, because the move will be made by the user
     }
 

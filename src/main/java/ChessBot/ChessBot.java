@@ -1,109 +1,88 @@
 package ChessBot;
 
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 import ChessNetwork.Pieces.Move;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static ChessBot.BotHelper.getRawPieceValue;
+import static ChessBot.Heuristics.tables;
+import static ChessNetwork.BoardUtils.EMPTY;
+import static ChessNetwork.MoveGenerator.getAllMoves;
 
 public class ChessBot {
 
-
-    // Bot that plays chess
-    // Will use the MoveGenerator, ChessboardHelper and all the piece classes
-
-    /*
-    MOVEGENERATOR/CHESSBOARD GUIDE:
-    The first two arrays are the y and x coordinates of the piece
-     * The third array contains the piece type and color at the index 0, 2 for a white knight, -2 for a black knight etc.
-     * Index 1 of the third array contains if the piece has moved or not,
-     * this will not be used for most pieces but will be used for pawns, rooks and kings and is crucial for castling and en passant
-     * */
-    /*Negative values for black pieces, positive for white pieces
-    chessboard is y, x
-    * 1 = pawn
-    * 2 = knight
-    * 3 = bishop
-    * 4 = rook
-    * 5 = queen
-    * 6 = king
-    * 0 = empty
-    * */
-    /*The first two arrays are the y and x coordinates of the piece
-     * The third array contains the piece type and color at the index 0, 2 for a white knight, -2 for a black knight etc.
-     * Index 1 of the third array contains if the piece has moved or not,
-     * this will not be used for most pieces but will be used for pawns, rooks and kings and is crucial for castling and en passant
-     * */
-
-
-    //When given a chessboard, it will evaluate the position and return the best move
-    private final PieceTables pieceTables;
     private final int depth;
     private final int MAX_SCORE = Integer.MAX_VALUE - 10000;
     private final int MIN_SCORE = Integer.MIN_VALUE + 10000;
-    private final MoveGenerator moveGenerator;
     private int cutOffBranches;
     private int amountOfBranches;
-    private int ASPIRATION_WINDOW = 50;
-
-    private int[][][] currentPosition;
     private final int color;
-    private int confidence;
-    private Move bestMove;
 
-//    private Map<String, TranspositionEntry> transpositionTable;
 
-    public ChessBot(int depth, PieceTables pieceTables, int color, MoveGenerator moveGenerator) {
+
+    public ChessBot(int depth, int color) {
         this.depth = depth;
-        this.pieceTables = pieceTables;
-//        this.transpositionTable = new HashMap<>();
         this.color = color;
-        this.moveGenerator = moveGenerator;
+        System.out.println("Bot created with depth " + depth + " and color " + color);
     }
-/*
-    private void startSearch() {
-        //for each of the opponent's moves, start alpha beta search, then when the opponent's move is made, choose the best move from the list of moves that were searched
-
-        int howDeepWeRn = 0;
-        long[] currentPosition = new long[6];
-        currentPosition == moveGenerator.getWhitePawns()
 
 
-        // start iterative deepening if depth hasn't been reached
-        if (howDeepWeRn < depth) {
-            // clear transposition table
-            transpositionTable.clear();
-            // reset the best move
-            bestMove = null;
-            // start iterative deepening
-            for (int i = 1; i <= depth; i++) {
-                Result result = alphaBeta(currentPosition, i, MIN_SCORE, MAX_SCORE, color, true, transpositionTable);
-                if (result.move != null) {
-                    bestMove = result.move;
-                }
-                System.out.println("Depth: " + i + " Score: " + result.score + " Best move: " + result.move);
-                confidence = *//*percentage of depth completed*//* (int) (((double) i / depth) * 100);
-                howDeepWeRn++;
+    public Move getBestMove(Chessboard chessboard) {
+        // Get the best move
+        cutOffBranches = 0;
+        amountOfBranches = 0;
+        long startTime = System.currentTimeMillis();
+
+        List<Move> moves = getAllMoves(color, chessboard);
+        Move bestMove = null;
+        int bestScore = MIN_SCORE;
+        for (Move move : moves) {
+            chessboard.silentMove(move);
+            int score = alphaBeta(depth - 1, MIN_SCORE, MAX_SCORE, color, true, new HashMap<>(), chessboard).score;
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
             }
+            chessboard.restorePrevious();
         }
+        if (bestMove == null) {
+            System.out.println("No moves found");
+            return new Move(-1, -1, -1,-1, EMPTY);
+        }
+
+        long endTime = System.currentTimeMillis();
+        System.out.println("Time taken: " + (endTime - startTime) + "ms");
+        System.out.println("Cut off branches: " + cutOffBranches);
+        System.out.println("Amount of branches: " + amountOfBranches);
+        System.out.println("Percentage of branches cut off: " + ((double) cutOffBranches / amountOfBranches) * 100 + "%");
+        System.out.println("Best score: " + bestScore);
+        return bestMove;
     }
-*/
-    public Move getBestMove() {
-//        startSearch();
-//        //wait until confidence is over 80%
-//        while (confidence < 80) {
-//            try {
-//                Thread.sleep(100);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//        return bestMove;
-        return null;
-    }
-/*
-    private Result alphaBeta(int depth, int alpha, int beta, int color, boolean maximizingPlayer, Map<String, TranspositionEntry> transpositionTable) {
+    private Result alphaBeta(int depth, int alpha, int beta, int color, boolean maximizingPlayer, Map<String, TranspositionEntry> transpositionTable, Chessboard currentPosition) {
         amountOfBranches++;
-        String boardString = boardToString(moveGenerator);
+        String boardString = boardToString(currentPosition);
         TranspositionEntry transpositionEntry = transpositionTable.get(boardString);
-        int score = evaluate(color, moveGenerator);
+        int score = evaluate(currentPosition, color);
+        List<Move> moves = getAllMoves(color, currentPosition);
+        if (moves.size() == 0){
+            //checkmate or stalemate, return minimum score
+//            System.out.println("No moves found at end of branch");
+            return new Result(MIN_SCORE, null);
+        }
+        //order moves based on evaluation
+        Arrays.sort(new List[]{moves}, (o1, o2) -> {
+            currentPosition.silentMove((Move) o1);
+            int score1 = evaluate(currentPosition, color);
+            currentPosition.restorePrevious();
+            currentPosition.silentMove((Move) o2);
+            int score2 = evaluate(currentPosition, color);
+            currentPosition.restorePrevious();
+            return score2 - score1;
+        });
 
         // handle transposition table check here
         if (transpositionEntry != null) {
@@ -126,30 +105,20 @@ public class ChessBot {
             return new Result(score, null);
         } else if (depth == 0) {
             transpositionTable.put(boardString, new TranspositionEntry(score, depth, TranspositionEntry.Type.EXACT, null));
-            return new Result(score, null);
+//            System.out.println("Final score at end of branch: " + score);
+//            printBitboardAsChessboard(currentPosition[0]|currentPosition[1]|currentPosition[2]|currentPosition[3]|currentPosition[4]|currentPosition[5]|currentPosition[6]|currentPosition[7]|currentPosition[8]|currentPosition[9]|currentPosition[10]|currentPosition[11]);
+              return new Result(score, moves.get(0));
         }
         int bestScore;
         Move best;
-        List<Move> moves = moveGenerator.getAllMoves(color);
-        //order moves based on evaluation
-//        Arrays.sort(moves, (o1, o2) -> {
-//            int[][][] newBoard = ChessboardHelper.copyChessboard(chessboard);
-//            ChessboardHelper.makeMoveSilent(o1, newBoard);
-//            int score1 = evaluate(newBoard, color);
-//            newBoard = ChessboardHelper.copyChessboard(chessboard);
-//            ChessboardHelper.makeMoveSilent(o2, newBoard);
-//            int score2 = evaluate(newBoard, color);
-//            return score2 - score1;
-//        });
+
         if (maximizingPlayer) {
             bestScore = MIN_SCORE;
             best = new Move(-1, -1, -1, -1, EMPTY);
             for (Move move : moves) {
-
-                moveGenerator.makeMoveSilent(move);
-
-                Result result = alphaBeta(newBoard, depth - 1, alpha, beta, -color, false, transpositionTable);
-// check if we found a better move
+                currentPosition.silentMove(move);
+                Result result = alphaBeta(depth - 1, alpha, beta, -color, false, transpositionTable, currentPosition);
+                currentPosition.restorePrevious();
                 if (result.score > bestScore) {
                     best = move;
                     bestScore = result.score;
@@ -170,19 +139,19 @@ public class ChessBot {
             }
         } else {
             bestScore = MAX_SCORE;
-            best = new Move(-1, -1, -1, -1, EMPTY_SQUARE);
+            best = new Move(-1, -1, -1, -1, EMPTY);
             for (Move move : moves) {
-// make the move
-                int[][][] newBoard = ChessboardHelper.copyChessboard(chessboard);
-                ChessboardHelper.makeMoveSilent(move, newBoard);
-// call alpha beta recursively
-                Result result = alphaBeta(newBoard, depth - 1, alpha, beta, -color , true, transpositionTable);
-// check if we found a better move
+            // make the move
+                currentPosition.silentMove(move);
+                // call alpha beta recursively
+                Result result = alphaBeta(depth - 1, alpha, beta, -color, true, transpositionTable, currentPosition);
+                currentPosition.restorePrevious();
+                // check if we found a better move
                 if (result.score < bestScore) {
                     best = move;
                     bestScore = result.score;
                     beta = Math.min(beta, result.score);
-// handle cutoff
+                // handle cutoff
                     if (beta <= alpha) {
                         cutOffBranches++;
                         transpositionTable.put(boardString, new TranspositionEntry(bestScore, depth, TranspositionEntry.Type.UPPER_BOUND, best));
@@ -190,7 +159,7 @@ public class ChessBot {
                     }
                 }
             }
-// handle transposition table
+            // handle transposition table
             if (bestScore >= beta) {
                 transpositionTable.put(boardString, new TranspositionEntry(bestScore, depth, TranspositionEntry.Type.LOWER_BOUND, best));
             } else {
@@ -202,98 +171,46 @@ public class ChessBot {
 
 
 
-
-    public int evaluate(int[][][] chessboard, int color) {
+    public int evaluate(Chessboard chessboard, int color) {
         // Evaluate the position of the chessboard
+        // index 0-5 are white pieces, 6-11 are black pieces, pawn, knight, bishop, rook, queen, king
         int score = 0;
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                int piece = chessboard[y][x][0];
-                if (piece != 0) {
-                    score += getRawPieceValue(piece, color);
-                }
-            }
+        for (int i = 0; i < 12; i++) {
+            //count how many pieces in first bitboard
+            int pieceCount = Long.bitCount(chessboard.getWhitePieces() | chessboard.getBlackPieces());
+            //get the value of the piece, first 6 are white (so the piece is positive, 1 for pawn ect), last 6 are black
+            int pieceType = i < 6 ? i + 1 : (i - 5)*-1;
+            int pieceValue = getRawPieceValue(pieceType, color);
+            //add the value of the piece to the score
+            int score1 = pieceCount * pieceValue;
+
+            score += score1;
         }
         score += heuristics(chessboard, color);
-
+        score += tables(chessboard, color);
         return score;
     }
 
-    private int heuristics(int[][][] chessboard, int color) {
-        int[][] pawnPositions = PieceTables.pawnTable;
-        int[][] knightPositions = PieceTables.knightTable;
-        int[][] bishopPositions = PieceTables.bishopTable;
-        int[][] rookPositions = PieceTables.rookTable;
-        int[][] queenPositions = PieceTables.queenTable;
-        int[][] kingPositions = PieceTables.kingTable;
-        // the tables must be flipped for black
-        if (color == -1) {
-            pawnPositions = PieceTables.pawnTableBlack;
-            knightPositions = PieceTables.knightTableBlack;
-            bishopPositions = PieceTables.bishopTableBlack;
-            rookPositions = PieceTables.rookTableBlack;
-            queenPositions = PieceTables.queenTableBlack;
-            kingPositions = PieceTables.kingTableBlack;
-        }
+
+
+    private int heuristics(Chessboard chessboard, int color) {
+        // A heuristic to evaluate the position of the chessboard
+        //bitboards (color dependent, -1 for black, 1 for white)
+        Heuristics heuristics = new Heuristics(getPositionFromChessboard(chessboard), color);
         int score = 0;
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                int piece = chessboard[y][x][0];
-                if (piece == PAWN * color) {
-                    score += pawnPositions[y][x];
-                } else if (piece == KNIGHT * color) {
-                    score += knightPositions[y][x];
-                } else if (piece == BISHOP * color) {
-                    score += bishopPositions[y][x];
-                } else if (piece == ROOK * color) {
-                    score += rookPositions[y][x];
-                } else if (piece == QUEEN * color) {
-                    score += queenPositions[y][x];
-                } else if (piece == KING * color) {
-                    score += kingPositions[y][x];
-                }
-            }
-        }
-        return score/10;
+        //material score is already calculated in the evaluate function
+
+        //development score
+        score += heuristics.developementScore();
+        //castling score
+        score += heuristics.castlingScore();
+        //pawn structure score
+        score += heuristics.pawnStructureScore();
+        // two middle pawn bonus
+        score += heuristics.twoMiddlePawns();
+
+        return score;
     }
-
-    private int getRawPieceValue(int piece, int forColor) {
-        int value = 0;
-        // A heuristic to evaluate the value of a piece for the given color of the player
-        // The value is the same for both players, opponent colors are negative scores for the player
-        if (piece == PAWN * forColor) {
-            value = 100;
-        } else if (piece == KNIGHT * forColor) {
-            value = 320;
-        } else if (piece == BISHOP * forColor) {
-            value = 330;
-        } else if (piece == ROOK * forColor) {
-            value = 500;
-        } else if (piece == QUEEN * forColor) {
-            value = 900;
-        } else if (piece == KING * forColor) {
-            value = 20000;
-        } else if (piece == PAWN * -forColor) {
-            value = -100;
-        } else if (piece == KNIGHT * -forColor) {
-            value = -320;
-        } else if (piece == BISHOP * -forColor) {
-            value = -330;
-        } else if (piece == ROOK * -forColor) {
-            value = -500;
-        } else if (piece == QUEEN * -forColor) {
-            value = -900;
-        } else if (piece == KING * -forColor) {
-            value = -20000;
-        } else {
-            throw new IllegalStateException("Unexpected value: " + piece + " forColor: " + forColor + " piece: " + piece);
-        }
-
-        return value;
-    }
-
-
-
 
 
     private static class TranspositionEntry {
@@ -324,9 +241,41 @@ public class ChessBot {
             this.move = move;
         }
     }
-    public static String boardToString(MoveGenerator moveGenerator) {
+    public static String boardToString(Chessboard board) {
+        long[] chessboard = getPositionFromChessboard(board);
         // Returns a string representation of the board
         // This is used for saving positions
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 12; i++) {
+            long piece = chessboard[i];
+            while (piece != 0) {
+                int square = Long.numberOfTrailingZeros(piece);
+                int x = square % 8;
+                int y = square / 8;
+                sb.append(x);
+                sb.append(y);
+                sb.append(i);
+                piece &= piece - 1;
+            }
+        }
+        return sb.toString();
+    }
+    static long[] getPositionFromChessboard(Chessboard board){
+        long[] position = new long[12];
+        position[0] = board.getWhitePawns();
+        position[1] = board.getWhiteKnights();
+        position[2] = board.getWhiteBishops();
+        position[3] = board.getWhiteRooks();
+        position[4] = board.getWhiteQueens();
+        position[5] = board.getWhiteKings();
+        position[6] = board.getBlackPawns();
+        position[7] = board.getBlackKnights();
+        position[8] = board.getBlackBishops();
+        position[9] = board.getBlackRooks();
+        position[10] = board.getBlackQueens();
+        position[11] = board.getBlackKings();
 
-    }*/
+        return position;
+
+    }
 }

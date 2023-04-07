@@ -1,6 +1,5 @@
 package ChessNetwork;
 
-import ChessBot.PieceTables;
 import ChessNetwork.Game.BotPlayer;
 import ChessNetwork.Game.HumanPlayer;
 import ChessNetwork.Game.NeuralNetworkPlayer;
@@ -21,16 +20,18 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 import static java.lang.Math.abs;
 
-public class ChessBoard extends Application {
-    private final int DEPTH = 7;
+public class ChessUI extends Application {
+
+    private final int DEPTH = 5;
     private GridPane rootNode;
     @Getter
     private GridPane board;
     private GridPane menuButtons;
-
+    private final Color DARK_SQUARE = Color.DARKGOLDENROD;
+    private final Color WHITE_SQUARE = Color.WHITE;
     public static void main(String[] args) {
         launch(args);
     }
@@ -50,25 +51,20 @@ public class ChessBoard extends Application {
             for (int j = 0; j < 8; j++) {
                 Rectangle square = new Rectangle(50, 50);
                 if ((i + j) % 2 == 0) {
-                    square.setFill(Color.WHITE);
+                    square.setFill(WHITE_SQUARE);
                 } else {
-                    square.setFill(Color.DARKGOLDENROD);
+                    square.setFill(DARK_SQUARE);
                 }
-                square.setOnMouseClicked(event -> {
-                    int row = GridPane.getRowIndex(square);
-                    int col = GridPane.getColumnIndex(square);
-                    // add your logic here
-                });
                 board.add(square, i, j);
             }
         }
 
 
-        MoveGenerator moveGenerator = new MoveGenerator();
-        addPiecesToBoard(moveGenerator);
+        Chessboard chessboard = new Chessboard();
+        addPiecesToBoard(chessboard);
 
         // Add a button to either play against the computer or against another player
-        addOptions(moveGenerator);
+        addOptions(chessboard);
 
         // Create a Scene with the board and the menu bar on the right of the board
 
@@ -88,8 +84,8 @@ public class ChessBoard extends Application {
         primaryStage.show();
     }
 
-    private void addOptions(MoveGenerator moveGenerator) {
-        initNormalGame(moveGenerator);
+    private void addOptions(Chessboard chessboard) {
+        initNormalGame(chessboard);
         // Add a button to either play against the computer or against another player
         Button playAgainstComputerButton = new Button("Play against computer");
         Button playAgainstPlayerButton = new Button("Play against player");
@@ -101,39 +97,39 @@ public class ChessBoard extends Application {
         menuButtons.add(playAgainstPlayerButton, 8, 2);
         menuButtons.add(viewGameButton, 8, 3);
 
-        playAgainstComputer(playAgainstComputerButton, moveGenerator);
-        playAgainstEngine(playAgainstEngineButton,moveGenerator);
+        playAgainstComputer(playAgainstComputerButton, chessboard);
+        playAgainstEngine(playAgainstEngineButton,chessboard);
         playAgainstPlayer(playAgainstPlayerButton);
-        viewGame(viewGameButton, moveGenerator);
+        viewGame(viewGameButton, chessboard);
 
     }
 
-    private void initNormalGame(MoveGenerator moveGenerator) {
+    private void initNormalGame(Chessboard chessboard) {
         //human vs human
         Player whitePlayer = new HumanPlayer();
         Player blackPlayer = new HumanPlayer();
-        moveGenerator.resetChessBoard();
-        updateChessBoard(moveGenerator);
-        ChessGame game = new ChessGame(whitePlayer, blackPlayer, moveGenerator);
-        moveGenerator.addMoveListener(move -> updateChessBoard(moveGenerator));
-        game.addMoveListener((message, winner) -> handleGameEnd(message, winner, moveGenerator));
+        chessboard.resetChessBoard();
+        updateChessBoard(chessboard);
+        ChessGame game = new ChessGame(whitePlayer, blackPlayer, chessboard);
+        chessboard.addMoveListener(move -> updateChessBoard(chessboard));
+        game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
     }
 
-    private void playAgainstEngine(Button playAgainstEngineButton, MoveGenerator moveGenerator) {
+    private void playAgainstEngine(Button playAgainstEngineButton, Chessboard chessboard) {
         // engine is ChessBot.class
         playAgainstEngineButton.setOnAction(event -> {
-            moveGenerator.resetChessBoard();
-            Player engine = new BotPlayer(DEPTH, new PieceTables(), BLACK, moveGenerator);
+            chessboard.resetChessBoard();
+            Player engine = new BotPlayer(DEPTH, BLACK, chessboard);
             Player humanPlayer = new HumanPlayer();
 
-            updateChessBoard(moveGenerator);
-                ChessGame game = new ChessGame(humanPlayer, engine, moveGenerator);
-                moveGenerator.addMoveListener(move -> updateChessBoard(moveGenerator));
-                game.addMoveListener((message, winner) -> handleGameEnd(message, winner, moveGenerator));
+            updateChessBoard(chessboard);
+                ChessGame game = new ChessGame(humanPlayer, engine, chessboard);
+                chessboard.addMoveListener(move -> updateChessBoard(chessboard));
+                game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
         });
     }
 
-    private void handleGameEnd(String message, int winner, MoveGenerator moveGenerator) {
+    private void handleGameEnd(String message, int winner, Chessboard moveGenerator) {
         //if not a draw
         if (winner != 0) {
             //find the winner king and color it green
@@ -167,7 +163,7 @@ public class ChessBoard extends Application {
         return null;
     }
 
-    private void viewGame(Button viewGameButton, MoveGenerator moveGenerator) {
+    private void viewGame(Button viewGameButton, Chessboard moveGenerator) {
         viewGameButton.setOnAction(event -> {
             //get list of games in the games folder
             moveGenerator.resetChessBoard();
@@ -180,29 +176,28 @@ public class ChessBoard extends Application {
         });
     }
 
-    private void playAgainstComputer(Button playAgainstComputerButton, MoveGenerator moveGenerator) {
+    private void playAgainstComputer(Button playAgainstComputerButton, Chessboard chessboard) {
         playAgainstComputerButton.setOnAction(event -> {
             NeuralNetworkPlayer networkPlayer = new NeuralNetworkPlayer(DEPTH);
             Player humanPlayer = new HumanPlayer();
-            moveGenerator.resetChessBoard();
-            updateChessBoard(moveGenerator);
-                ChessGame game = new ChessGame(humanPlayer, networkPlayer, moveGenerator);
-                moveGenerator.addMoveListener(move -> {
-                        updateChessBoard(moveGenerator);
+            chessboard.resetChessBoard();
+            updateChessBoard(chessboard);
+                ChessGame game = new ChessGame(humanPlayer, networkPlayer, chessboard);
+                chessboard.addMoveListener(move -> {
+                        updateChessBoard(chessboard);
                 });
-                game.addMoveListener((message, winner) -> handleGameEnd(message, winner, moveGenerator));
+                game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
         });
     }
 
 
-    private void addPiecesToBoard(MoveGenerator moveGenerator) {
+    private void addPiecesToBoard(Chessboard chessboard) {
         // Add the pieces to the board
         for (int row = 0; row < 8; row++) {
             for (int col = 0; col < 8; col++) {
                 // Add the pieces to the board
-                int pieceType = moveGenerator.getPieceType(col, row);
+                int pieceType = chessboard.getPieceType(col, row);
                 String piece = getPieceTypeAsStr(pieceType).toLowerCase();
-                System.out.println(piece);
                 if (piece.equals("empty")) {
                     continue;
                 }
@@ -211,37 +206,41 @@ public class ChessBoard extends Application {
                 imageView.setFitWidth(50);
                 imageView.setImage(new Image("pieces/" + piece + ".png"));
                 board.add(imageView, col, row);
-                handlePieceClick(imageView, col, row, moveGenerator, pieceType);
+                int finalCol = col;
+                int finalRow = row;
+                imageView.setOnMouseClicked(event -> {
+                    ArrayList<Move> movesToHighlight = getMovesToHighlight(finalCol, finalRow, pieceType, chessboard);
+                    for (Move move : movesToHighlight) {
+                        Rectangle square = (Rectangle) getNodeByRowColumnIndex(move.getToY(), move.getToX() , board);
+                        if (square != null) {
+                            square.setFill(Color.GREEN);
+                            //if click on green square
+                            square.setOnMouseClicked(event1 -> {
+                                //move piece
+                                chessboard.makeMove(move);
+                                //update board
+                                updateChessBoard(chessboard);
+                                //unhighlight
+                                unhighlight();
+                            });
+                        }
+                    }
+                });
             }
         }
     }
-
-    void handlePieceClick(ImageView imageView, int x, int y, MoveGenerator moveGenerator, int pieceType) {
-        imageView.setOnMouseClicked(event -> {
-            System.out.println("Clicked on " + x + " " + y);
-            Move[] movesToHighlight = getMovesToHighlight(moveGenerator, x, y, pieceType);
-            for (Move move : movesToHighlight) {
-                int row = move.getToY();
-                int col = move.getToX();
-                Rectangle square = (Rectangle) getNodeByRowColumnIndex(row, col, board);
-                if (square != null) {
-                    square.setFill(Color.GREEN);
-                }
-            }
-        });
-    }
-
-    private Move[] getMovesToHighlight(MoveGenerator moveGenerator, int x, int y, int pieceType) {
+    private ArrayList<Move> getMovesToHighlight(int x, int y, int pieceType, Chessboard chessboard) {
+        System.out.println("getMovesToHighlight for " + x + " " + y + " " + pieceType);
         int color = pieceType > 0 ? WHITE : BLACK;
         int piece = abs(pieceType);
         return switch (piece) {
-            case PAWN -> Pawn.getMoves(x, y, color, moveGenerator);
-            case KNIGHT -> Knight.getMoves(x, y, color, moveGenerator);
-            case BISHOP -> Bishop.getMoves(x, y, color, moveGenerator);
-            case ROOK -> Rook.getMoves(x, y, color, moveGenerator);
-            case QUEEN -> Queen.getMoves(x, y, color, moveGenerator);
-            case KING -> King.getMoves(x, y, color, moveGenerator);
-            default -> new Move[0];
+            case PAWN -> Pawn.getMoves(x, y, color, chessboard);
+            case KNIGHT -> Knight.getMoves(x, y, color, chessboard);
+            case BISHOP -> Bishop.getMoves(x, y, color, chessboard);
+            case ROOK -> Rook.getMoves(x, y, color, chessboard);
+            case QUEEN -> Queen.getMoves(x, y, color, chessboard);
+            case KING -> King.getMoves(x, y, color, chessboard);
+            default -> new ArrayList<>();
         };
     }
 
@@ -251,17 +250,30 @@ public class ChessBoard extends Application {
         for (Node node : nodes) {
             if (node instanceof Rectangle) {
                 if (((Rectangle) node).getFill() == Color.GREEN) {
-                    board.getChildren().remove(node);
+                    //make it the original color
+                    int row = GridPane.getRowIndex(node);
+                    int col = GridPane.getColumnIndex(node);
+                    if ((row + col) % 2 == 0) {
+                        ((Rectangle) node).setFill(WHITE_SQUARE);
+                    } else {
+                        ((Rectangle) node).setFill(DARK_SQUARE);
+                    }
                 }
             }
         }
     }
 
-    private void updateChessBoard(MoveGenerator moveGenerator) {
+    private void updateChessBoard(Chessboard moveGenerator) {
         //use the queue to update the board without producing concurrent modification exception
                 unhighlight();
                 board.getChildren().removeIf(node -> node instanceof ImageView);
+                //remove all listeners
+                List<Node> nodes = new ArrayList<>(board.getChildren());
+                for (Node node : nodes) {
+                    if (node instanceof Rectangle) {
+                        node.setOnMouseClicked(null);
+                    }
+                }
                 addPiecesToBoard(moveGenerator);
-
     }
 }

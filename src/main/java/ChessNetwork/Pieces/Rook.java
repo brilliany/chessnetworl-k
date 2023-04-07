@@ -1,29 +1,29 @@
 package ChessNetwork.Pieces;
 
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 
 import java.util.ArrayList;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 
 public class Rook {
 
-    public static Move[] getMoves(int x, int y, int color,MoveGenerator moveGenerator) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
 
         ArrayList<Move> moves = new ArrayList<>();
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 
         // up
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, -1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, -1,ROOK*color);
         // down
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, 1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, 1,ROOK*color);
         // right
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 0);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 0,ROOK*color);
         // left
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 0);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 0,ROOK*color);
 
-        return moves.toArray(new Move[0]);
+        return moves;
     }
 
 

@@ -6,10 +6,10 @@ import ChessNetwork.Game.Player;
 import java.util.ArrayList;
 import java.util.List;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 
 public class ChessGame {
-    private final MoveGenerator moveGenerator;
+    private final Chessboard chessboard;
 
     Player player1;
     Player player2;
@@ -21,10 +21,10 @@ public class ChessGame {
     //then call the method on all listeners
 
 
-    public ChessGame(Player player1, Player player2, MoveGenerator moveGenerator) {
+    public ChessGame(Player player1, Player player2, Chessboard chessboard) {
         this.player1 = player1;
         this.player2 = player2;
-        this.moveGenerator = moveGenerator;
+        this.chessboard = chessboard;
         startGame();
     }
 
@@ -32,37 +32,37 @@ public class ChessGame {
         System.out.println("Starting game");
     // use player.awaitMove() and then wait for moveGenerator.addMoveListener() to be called
         //there has to always be a human, so the human starts the game
-        moveGenerator.addMoveListener(move -> {
+        chessboard.addMoveListener(move -> {
             if (gameEnded()) {
                 System.out.println("Game ended");
                 return;
             }
             if (getColor(move.getPiece()) == player1.getColor()) {
-                player2.awaitMove(BLACK, moveGenerator);
+                player2.awaitMove(BLACK, chessboard);
             } else {
-                player1.awaitMove( WHITE, moveGenerator);
+                player1.awaitMove( WHITE, chessboard);
             }
         });
         System.out.println("Player 1: " + player1.getClass().getSimpleName());
         if (player1 instanceof HumanPlayer) {
             player1.init(this, WHITE);
             player2.init(this, BLACK);
-            player1.awaitMove(WHITE, moveGenerator);
+            player1.awaitMove(WHITE, chessboard);
         } else {
             player1.init(this, WHITE);
             player2.init(this, BLACK);
-            player2.awaitMove( BLACK, moveGenerator);
+            player2.awaitMove( BLACK, chessboard);
         }
     }
 
 
 
     private boolean gameEnded() {
-        if (moveGenerator.isCheckmate(BLACK) || moveGenerator.isCheckmate(WHITE)) {
+        if (MoveGenerator.isCheckmate(BLACK,chessboard) || MoveGenerator.isCheckmate(WHITE,chessboard)) {
             callGameEndListeners("checkmate", 1);
             return true;
         }
-        if (moveGenerator.isStalemate(BLACK) || moveGenerator.isStalemate(WHITE)) {
+        if (MoveGenerator.isStalemate(BLACK, chessboard) || MoveGenerator.isStalemate(WHITE, chessboard)) {
             callGameEndListeners("stalemate", 0);
             return true;
         }

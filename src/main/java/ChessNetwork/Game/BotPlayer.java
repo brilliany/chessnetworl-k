@@ -1,27 +1,26 @@
 package ChessNetwork.Game;
 
-import ChessBot.PieceTables;
 import ChessNetwork.ChessGame;
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 import ChessNetwork.Pieces.Move;
 
 public class BotPlayer extends Player {
     private final ChessBot.ChessBot bot;
 
-    public BotPlayer(int depth, PieceTables pieceTables,int color, MoveGenerator moveGenerator) {
+    public BotPlayer(int depth, int color, Chessboard chessboard) {
         super();
-        this.bot = new ChessBot.ChessBot(depth, pieceTables, color, moveGenerator);
+        this.bot = new ChessBot.ChessBot(depth, color);
     }
 
-    public Move getMove(int color, MoveGenerator moveGenerator) {
-        return bot.getBestMove();
+    public Move getMove(int color, Chessboard chessboard) {
+        return bot.getBestMove(chessboard);
     }
 
     @Override
-    public void awaitMove(int color, MoveGenerator moveGenerator) {
+    public void awaitMove(int color, Chessboard chessboard) {
         //call listener with the move
-        Move move = getMove(color, moveGenerator);
-        moveGenerator.makeMove(move);
+        Move move = getMove(color, chessboard);
+        chessboard.makeMove(move);
     }
 
 

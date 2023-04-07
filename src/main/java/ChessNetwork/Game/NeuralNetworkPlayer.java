@@ -1,6 +1,7 @@
 package ChessNetwork.Game;
 
 import ChessNetwork.ChessGame;
+import ChessNetwork.Chessboard;
 import ChessNetwork.MoveGenerator;
 import ChessNetwork.Pieces.Move;
 
@@ -23,7 +24,7 @@ public class NeuralNetworkPlayer extends Player {
     }
 
     @Override
-    public void awaitMove(int color, MoveGenerator moveGenerator) {
+    public void awaitMove(int color, Chessboard chessboard) {
 /*        //call listener with the move
         Move move = getMove(boardState, color, moveGenerator);
 

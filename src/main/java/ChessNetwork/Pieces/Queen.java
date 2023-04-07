@@ -1,37 +1,36 @@
 package ChessNetwork.Pieces;
 
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 
 import java.util.ArrayList;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 
 public class Queen {
 
 
-    public static Move[] getMoves(int x, int y, int color,MoveGenerator moveGenerator) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
         ArrayList<Move> moves = new ArrayList<>();
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
 
         // up
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, -1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, -1,QUEEN*color);
         // down
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, 1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 0, 1,QUEEN*color);
         // right
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 0);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 0,QUEEN*color);
         // left
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 0);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 0,QUEEN*color);
         // up right
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, -1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, -1,QUEEN*color);
         // up left
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, -1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, -1,QUEEN*color);
         // down right
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 1);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, 1, 1,QUEEN*color);
         // down left
-        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 1);
-
-        return moves.toArray(new Move[0]);
+        addMovesInDirection(moves, blackPieces, whitePieces, color, x, y, -1, 1,QUEEN*color);
+        return moves;
     }
 
 }

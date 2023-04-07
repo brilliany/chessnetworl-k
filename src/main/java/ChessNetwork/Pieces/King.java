@@ -1,107 +1,69 @@
 package ChessNetwork.Pieces;
 
+import ChessNetwork.BoardUtils;
+import ChessNetwork.Chessboard;
 import ChessNetwork.MoveGenerator;
 
 import java.util.ArrayList;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 
 
 public class King {
 
-    public static Move[] getMoves(int x, int y, int color,MoveGenerator moveGenerator) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard moveGenerator) {
 
         ArrayList<Move> moves = new ArrayList<>();
         long whitePieces = moveGenerator.getWhitePieces();
         long blackPieces = moveGenerator.getBlackPieces();
-        int opponentColor = color == WHITE ? BLACK : WHITE;
 
-        // up
-        long up = (y+1L)*8 + x;
-        if ((whitePieces & up) == 0 && (blackPieces & up) == 0) {
-            moves.add(new Move(x, y, x, y+1, KING));
-        } else if ((whitePieces & up) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x, y+1, KING));
-        } else if ((blackPieces & up) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x, y+1, KING));
+        long[] squares = new long[]{
+                (1L << (x + 1)) << (8 * (y - 1)), // up right
+                (1L << (x + 1)) << (8 * y), // right
+                (1L << (x + 1)) << (8 * (y + 1)), // down right
+                (1L << x) << (8 * (y + 1)), // down
+                (1L << (x - 1)) << (8 * (y + 1)), // down left
+                (1L << (x - 1)) << (8 * y), // left
+                (1L << (x - 1)) << (8 * (y - 1)), // up left
+                (1L << x) << (8 * (y - 1)) // up
+        };
+
+
+        for (long square : squares) {
+            int squareX = Long.numberOfTrailingZeros(square) % 8;
+            int squareY = Long.numberOfTrailingZeros(square) / 8;
+            //if square is within 1 square of king (squares flip to the other side of the board when king is on the edge)
+            int deltaX = Math.abs(x - squareX);
+            int deltaY = Math.abs(y - squareY);
+            if (deltaX > 1 || deltaY > 1) {
+                continue;
+            }
+
+            if (color == WHITE) {
+                if ((whitePieces & square) == 0) {
+                    moves.add(new Move(x, y, squareX, squareY, KING*color));
+                }
+            } else {
+                if ((blackPieces & square) == 0) {
+                    moves.add(new Move(x, y, squareX, squareY, KING*color));
+                }
+            }
         }
-        // down
-        long down = (y-1L)*8 + x;
-        if ((whitePieces & down) == 0 && (blackPieces & down) == 0) {
-            moves.add(new Move(x, y, x, y-1, KING));
-        } else if ((whitePieces & down) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x, y-1, KING));
-        } else if ((blackPieces & down) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x, y-1, KING));
-        }
-        // right
-        long right = y* 8L + x+1L;
-        if ((whitePieces & right) == 0 && (blackPieces & right) == 0) {
-            moves.add(new Move(x, y, x+1, y, KING));
-        } else if ((whitePieces & right) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x+1, y, KING));
-        } else if ((blackPieces & right) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x+1, y, KING));
-        }
-        // left
-        long left = y* 8L + x-1L;
-        if ((whitePieces & left) == 0 && (blackPieces & left) == 0) {
-            moves.add(new Move(x, y, x-1, y, KING));
-        } else if ((whitePieces & left) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x-1, y, KING));
-        } else if ((blackPieces & left) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x-1, y, KING));
-        }
-        // up right
-        long upRight = (y+1L)*8 + x+1L;
-        if ((whitePieces & upRight) == 0 && (blackPieces & upRight) == 0) {
-            moves.add(new Move(x, y, x+1, y+1, KING));
-        } else if ((whitePieces & upRight) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x+1, y+1, KING));
-        } else if ((blackPieces & upRight) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x+1, y+1, KING));
-        }
-        // up left
-        long upLeft = (y+1L)*8 + x-1L;
-        if ((whitePieces & upLeft) == 0 && (blackPieces & upLeft) == 0) {
-            moves.add(new Move(x, y, x-1, y+1, KING));
-        } else if ((whitePieces & upLeft) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x-1, y+1, KING));
-        } else if ((blackPieces & upLeft) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x-1, y+1, KING));
-        }
-        // down right
-        long downRight = (y-1L)*8 + x+1L;
-        if ((whitePieces & downRight) == 0 && (blackPieces & downRight) == 0) {
-            moves.add(new Move(x, y, x+1, y-1, KING));
-        } else if ((whitePieces & downRight) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x+1, y-1, KING));
-        } else if ((blackPieces & downRight) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x+1, y-1, KING));
-        }
-        // down left
-        long downLeft = (y-1L)*8 + x-1L;
-        if ((whitePieces & downLeft) == 0 && (blackPieces & downLeft) == 0) {
-            moves.add(new Move(x, y, x-1, y-1, KING));
-        } else if ((whitePieces & downLeft) == 0 && color == WHITE) {
-            moves.add(new Move(x, y, x-1, y-1, KING));
-        } else if ((blackPieces & downLeft) == 0 && color == BLACK) {
-            moves.add(new Move(x, y, x-1, y-1, KING));
-        }
+
         // castling
         handleCastling(moves, x, y, color, moveGenerator);
 
-        return moves.toArray(new Move[0]);
+        return moves;
     }
 
-    private static void handleCastling(ArrayList<Move> moves, int x, int y, int color, MoveGenerator moveGenerator) {
-        if (moveGenerator.isCheck(color)){
+    private static void handleCastling(ArrayList<Move> moves, int x, int y, int color, Chessboard chessboard) {
+        if (MoveGenerator.isCheck(color, chessboard)){
             return;
         }
-        boolean rightsShort = moveGenerator.getCastleRights(color, 0);
-        boolean rightsLong = moveGenerator.getCastleRights(color, 1);
-        long whitePieces = moveGenerator.getWhitePieces();
-        long blackPieces = moveGenerator.getBlackPieces();
+        boolean rightsShort = chessboard.getCastleRights(color, 1);
+        boolean rightsLong = chessboard.getCastleRights(color, 0);
+        long whitePieces = chessboard.getWhitePieces();
+        long blackPieces = chessboard.getBlackPieces();
         int opponentColor = color == WHITE ? BLACK : WHITE;
         if (color == WHITE) {
             if (rightsShort) {
@@ -110,8 +72,8 @@ public class King {
                     //if the squares are not attacked by the opponent
                     int firstSquareX = 5;
                     int secondSquareX = 6;
-                    if (!moveGenerator.isAttacked(firstSquareX, 0, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 0, opponentColor)) {
-                        moves.add(new Move(x, y, 6, y, KING));
+                    if (!BoardUtils.isAttacked(firstSquareX, 0, color, chessboard) && !BoardUtils.isAttacked(secondSquareX, 0, color, chessboard)) {
+                        moves.add(new Move(x, y, 6, y, KING*color));
                     }
                 }
             }
@@ -122,8 +84,8 @@ public class King {
                     int firstSquareX = 3;
                     int secondSquareX = 2;
                     int thirdSquareX = 1;
-                    if (!moveGenerator.isAttacked(firstSquareX, 0, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 0, opponentColor) && !moveGenerator.isAttacked(thirdSquareX, 0, opponentColor)) {
-                        moves.add(new Move(x, y, 2, y, KING));
+                    if (!BoardUtils.isAttacked(firstSquareX, 0, color,chessboard) && !BoardUtils.isAttacked(secondSquareX, 0, color, chessboard) && !BoardUtils.isAttacked(thirdSquareX, 0, color, chessboard)) {
+                        moves.add(new Move(x, y, 2, y, KING*color));
                     }
                 }
             }
@@ -135,8 +97,8 @@ public class King {
                     //if the squares are not attacked by the opponent
                     int firstSquareX = 5;
                     int secondSquareX = 6;
-                    if (!moveGenerator.isAttacked(firstSquareX, 7, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 7, opponentColor)) {
-                        moves.add(new Move(x, y, 6, y, KING));
+                    if (!BoardUtils.isAttacked(firstSquareX, 7, color, chessboard) && !BoardUtils.isAttacked(secondSquareX, 7, color, chessboard)) {
+                        moves.add(new Move(x, y, 6, y, KING*color));
                     }
                 }
             }
@@ -147,8 +109,8 @@ public class King {
                     int firstSquareX = 3;
                     int secondSquareX = 2;
                     int thirdSquareX = 1;
-                    if (!moveGenerator.isAttacked(firstSquareX, 7, opponentColor) && !moveGenerator.isAttacked(secondSquareX, 7, opponentColor) && !moveGenerator.isAttacked(thirdSquareX, 7, opponentColor)) {
-                        moves.add(new Move(x, y, 2, y, KING));
+                    if (!BoardUtils.isAttacked(firstSquareX, 7, color, chessboard) && !BoardUtils.isAttacked(secondSquareX, 7, opponentColor, chessboard) && !BoardUtils.isAttacked(thirdSquareX, 7, color, chessboard)) {
+                        moves.add(new Move(x, y, 2, y, KING*color));
                     }
                 }
             }

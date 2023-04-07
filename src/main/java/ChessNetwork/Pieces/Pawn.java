@@ -1,99 +1,87 @@
 package ChessNetwork.Pieces;
 
-import ChessNetwork.ChessboardHelper;
-import ChessNetwork.MoveGenerator;
+import ChessNetwork.Chessboard;
 
 import java.util.ArrayList;
 
-import static ChessNetwork.ChessboardHelper.*;
+import static ChessNetwork.BoardUtils.*;
 
 public class Pawn {
 
 
 
-    public static Move[] getMoves(int x, int y, int color, MoveGenerator moveGenerator) {
+    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard chessboard) {
         //Color is 1 for white and -1 for black, so we can use it to determine the direction of the pawn
         ArrayList<Move> moves = new ArrayList<>();
-        //shift bitboard one and step in the direction of the pawn (*color to get the right direction)
-        long oneStep = 1L << (x+8*(y+color));
-        long twoStep = 1L << (x+16*(y+color));
-        long captureLeft = 1L << (x-1+8*(y+color));
-        long captureRight = 1L << (x+1+8*(y+color));
-
+        //shift bitboard one and step in the direction of the pawn (*direction to get the right direction)
+        int direction = -color;
+        long oneStep = 1L << (x + (y + direction) * 8);
+        long twoStep = 1L << (x + (y + direction * 2) * 8);
+        long captureLeft = 1L << (x - 1 + (y + direction) * 8);
+        long captureRight = 1L << (x + 1 + (y + direction) * 8);
         //get if the move is blocked
         switch (color) {
             case WHITE -> {
-                long pieces = moveGenerator.getWhitePieces();
-                ChessboardHelper.printBitboardAsChessboard(pieces);
+                long pieces = chessboard.getWhitePieces();
+                long opponentPieces = chessboard.getBlackPieces();
                 //if the onestep bit is empty in the whitePieces bitboard, add it to the moves
-                if ((pieces & oneStep) == 0) {
-                    moves.add(new Move(x, y, x, y + color, PAWN*WHITE));
+                if ((pieces & oneStep) == 0 && (opponentPieces & oneStep) == 0) {
+                    moves.add(new Move(x, y, x, y + direction, PAWN*WHITE));
                     //if the pawn hasnt moved, check if the two step move is empty
-                    if (y == 1) {
-                        if ((pieces & twoStep) == 0) {
-                            moves.add(new Move(x, y, x, y + color * 2, PAWN*WHITE));
-                        }
+                    if (y==6)
+                        if ((pieces & twoStep) == 0 && (opponentPieces & twoStep) == 0) {
+                        moves.add(new Move(x, y, x, y + direction * 2, PAWN*WHITE));
                     }
                 }
                 //check if the capture moves are valid
-                if ((moveGenerator.getBlackPieces() & captureLeft) != 0) {
-                    moves.add(new Move(x, y, x - 1, y + color, PAWN*WHITE));
+                if ((opponentPieces & captureLeft) != 0) {
+                    moves.add(new Move(x, y, x - 1, y + direction, PAWN*WHITE));
                 }
-                if ((moveGenerator.getBlackPieces() & captureRight) != 0) {
-                    moves.add(new Move(x, y, x + 1, y + color, PAWN*WHITE));
+                if ((opponentPieces & captureRight) != 0) {
+                    moves.add(new Move(x, y, x + 1, y + direction, PAWN*WHITE));
                 }
                 //en passant
-                long blackPiecesPrev = moveGenerator.getBlackPiecesPrevious();
+                long blackPiecesPrev = chessboard.getHistory().get((chessboard.getHistory().size() - 1))[1];
                 //if the pawn is on the 5th rank, check if the previous move was a double step move
                 if (y == 4) {
                     //if the previous move was a double step move, check if the pawn is on the right side
-                    enPassantCheck(x, y, color, moves, twoStep, blackPiecesPrev, WHITE);
+                    enPassantCheck(x, y, color, moves, twoStep, blackPiecesPrev);
                 }
             }
             case BLACK -> {
-                long pieces = moveGenerator.getBlackPieces();
-                //if the onestep bit is empty in the blackPieces bitboard, add it to the moves
-                if ((pieces & oneStep) == 0) {
-                    moves.add(new Move(x, y, x, y + color, PAWN*BLACK));
+                long pieces = chessboard.getBlackPieces();
+                long opponentPieces = chessboard.getWhitePieces();
+                //if the onestep bit is empty in the whitePieces bitboard, add it to the moves
+                if ((pieces & oneStep) == 0 && (opponentPieces & oneStep) == 0) {
+                    moves.add(new Move(x, y, x, y + direction, PAWN*BLACK));
                     //if the pawn hasnt moved, check if the two step move is empty
-                    if (y == 6) {
+                    if (y==1)
                         if ((pieces & twoStep) == 0) {
-                            moves.add(new Move(x, y, x, y + color * 2, PAWN*BLACK));
+                            moves.add(new Move(x, y, x, y + direction * 2, PAWN*BLACK));
                         }
-                    }
                 }
                 //check if the capture moves are valid
-                if ((moveGenerator.getWhitePieces() & captureLeft) != 0) {
-                    moves.add(new Move(x, y, x - 1, y + color, PAWN*BLACK));
+                if ((opponentPieces & captureLeft) != 0) {
+                    moves.add(new Move(x, y, x - 1, y + direction, PAWN*BLACK));
                 }
-                if ((moveGenerator.getWhitePieces() & captureRight) != 0) {
-                    moves.add(new Move(x, y, x + 1, y + color, PAWN*BLACK));
+                if ((opponentPieces & captureRight) != 0) {
+                    moves.add(new Move(x, y, x + 1, y + direction, PAWN*BLACK));
                 }
                 //en passant
-                long whitePiecesPrev = moveGenerator.getWhitePiecesPrevious();
+                long whitePiecesPrev = chessboard.getHistory().get((chessboard.getHistory().size() - 1))[0];
                 //if the pawn is on the 5th rank, check if the previous move was a double step move
                 if (y == 3) {
                     //if the previous move was a double step move, check if the pawn is on the right side
-                    enPassantCheck(x, y, color, moves, twoStep, whitePiecesPrev, BLACK);
+                    enPassantCheck(x, y, color, moves, twoStep, whitePiecesPrev);
                 }
             }
         }
-        System.out.println("Pawn moves: " + moves);
-        return moves.toArray(new Move[0]);
+
+        return moves;
     }
 
-    private static void enPassantCheck(int x, int y, int color, ArrayList<Move> moves, long twoStep, long whitePiecesPrev, int black) {
-        if ((whitePiecesPrev & twoStep) != 0) {
-            //if the pawn is on the right side, check if the pawn is on the right side
-            if (x == 0) {
-                moves.add(new Move(x, y, x + 1, y + color, PAWN* black));
-            } else if (x == 7) {
-                moves.add(new Move(x, y, x - 1, y + color, PAWN* black));
-            } else {
-                moves.add(new Move(x, y, x + 1, y + color, PAWN* black));
-                moves.add(new Move(x, y, x - 1, y + color, PAWN* black));
-            }
-        }
+    private static void enPassantCheck(int x, int y, int color, ArrayList<Move> moves, long twoStep, long whitePiecesPrev) {
+        //todo
     }
 
 }

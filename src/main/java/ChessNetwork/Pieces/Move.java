@@ -11,8 +11,6 @@ public class Move {
     private boolean capture;
 
     public Move(int x, int y, int newX, int newY, int piece) {
-        // Check if the move is out of bounds
-
         this.piece = piece;
         this.x = x;
         this.y = y;
