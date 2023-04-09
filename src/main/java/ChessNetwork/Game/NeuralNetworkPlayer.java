@@ -32,7 +32,7 @@ public class NeuralNetworkPlayer extends Player {
     }
 
     @Override
-    public void init(ChessGame chessGame, int color) {
+    public void init(ChessGame chessGame) {
         this.chessGame = chessGame;
     }
 }

@@ -24,7 +24,7 @@ import static ChessNetwork.BoardUtils.*;
 
 public class ChessUI extends Application {
 
-    private final int DEPTH = 5;
+    private final int DEPTH = 8;
     private GridPane rootNode;
     @Getter
     private GridPane board;
@@ -89,24 +89,42 @@ public class ChessUI extends Application {
         Button playAgainstComputerButton = new Button("Play against computer");
         Button playAgainstPlayerButton = new Button("Play against player");
         Button playAgainstEngineButton = new Button("Play against engine");
+        Button engineVsEngineButton = new Button("Engine vs engine");
         Button viewGameButton = new Button("View game");
         // Add the buttons to the board so that they are on the right of the chess board
         menuButtons.add(playAgainstComputerButton, 8, 0);
         menuButtons.add(playAgainstEngineButton, 8, 1);
         menuButtons.add(playAgainstPlayerButton, 8, 2);
         menuButtons.add(viewGameButton, 8, 3);
+        menuButtons.add(engineVsEngineButton, 8, 4);
 
         playAgainstComputer(playAgainstComputerButton, chessboard);
         playAgainstEngine(playAgainstEngineButton,chessboard);
         playAgainstPlayer(playAgainstPlayerButton);
         viewGame(viewGameButton, chessboard);
+        engineVsEngine(engineVsEngineButton, chessboard);
+    }
 
+    private void engineVsEngine(Button engineVsEngineButton, Chessboard chessboard) {
+        engineVsEngineButton.setOnAction(event -> {
+            initEngineGame(chessboard);
+        });
     }
 
     private void initNormalGame(Chessboard chessboard) {
         //human vs human
-        Player whitePlayer = new HumanPlayer();
-        Player blackPlayer = new HumanPlayer();
+        Player whitePlayer = new HumanPlayer(WHITE, chessboard);
+        Player blackPlayer = new HumanPlayer(BLACK, chessboard);
+        chessboard.resetChessBoard();
+        updateChessBoard(chessboard);
+        chessboard.addMoveListener(move -> updateChessBoard(chessboard));
+        ChessGame game = new ChessGame(whitePlayer, blackPlayer, chessboard);
+        game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
+    }
+    private void initEngineGame(Chessboard chessboard) {
+        //human vs human
+        Player whitePlayer = new BotPlayer(DEPTH, WHITE, chessboard);
+        Player blackPlayer = new BotPlayer(DEPTH, BLACK, chessboard);
         chessboard.resetChessBoard();
         updateChessBoard(chessboard);
         ChessGame game = new ChessGame(whitePlayer, blackPlayer, chessboard);
@@ -118,8 +136,8 @@ public class ChessUI extends Application {
         // engine is ChessBot.class
         playAgainstEngineButton.setOnAction(event -> {
             chessboard.resetChessBoard();
-            Player engine = new BotPlayer(DEPTH, BLACK, chessboard);
-            Player humanPlayer = new HumanPlayer();
+            Player engine = new BotPlayer(DEPTH, WHITE, chessboard);
+            Player humanPlayer = new HumanPlayer(BLACK, chessboard);
 
             updateChessBoard(chessboard);
                 ChessGame game = new ChessGame(humanPlayer, engine, chessboard);
@@ -178,14 +196,15 @@ public class ChessUI extends Application {
     private void playAgainstComputer(Button playAgainstComputerButton, Chessboard chessboard) {
         playAgainstComputerButton.setOnAction(event -> {
             NeuralNetworkPlayer networkPlayer = new NeuralNetworkPlayer(DEPTH);
-            Player humanPlayer = new HumanPlayer();
+            Player humanPlayer = new HumanPlayer(WHITE, chessboard);
             chessboard.resetChessBoard();
             updateChessBoard(chessboard);
-                ChessGame game = new ChessGame(humanPlayer, networkPlayer, chessboard);
-                chessboard.addMoveListener(move -> {
-                        updateChessBoard(chessboard);
-                });
-                game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
+            chessboard.addMoveListener(move -> {
+                updateChessBoard(chessboard);
+            });
+            ChessGame game = new ChessGame(humanPlayer, networkPlayer, chessboard);
+
+            game.addMoveListener((message, winner) -> handleGameEnd(message, winner, chessboard));
         });
     }
 
@@ -255,6 +274,7 @@ public class ChessUI extends Application {
     }
 
     private void updateChessBoard(Chessboard moveGenerator) {
+        System.out.println("update chessboard");
         //use the queue to update the board without producing concurrent modification exception
                 unhighlight();
                 board.getChildren().removeIf(node -> node instanceof ImageView);

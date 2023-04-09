@@ -7,11 +7,13 @@ public abstract class Player {
     //no constructor, because we won't be creating instances of this class, only of its subclasses
     protected int color;
     protected ChessGame chessGame;
+    protected Chessboard chessBoard;
+
     public int getColor() {
         return color;
     }
 
     public abstract void awaitMove(int color, Chessboard chessboard);
 
-    public abstract void init(ChessGame chessGame, int color);
+    public abstract void init(ChessGame chessGame);
 }

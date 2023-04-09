@@ -2,10 +2,10 @@ package ChessBot;
 
 import ChessNetwork.Chessboard;
 
-import static ChessBot.ChessBot.getPositionFromChessboard;
 import static ChessNetwork.BoardUtils.WHITE;
 
 public class Heuristics {
+
 
 
     final int color;
@@ -24,9 +24,17 @@ public class Heuristics {
 
     private static final int DEVELOPMENT_WEIGHT = 1;
     private static final int CASTLING_WEIGHT = 3;
-    private static final int TWO_MIDDLE_PAWNS_WEIGHT = 2;
+    private static final int TWO_MIDDLE_PAWNS_WEIGHT = 4;
     private static final int ISOLATED_PAWN_WEIGHT = -1;
     private static final int DOUBLED_PAWN_WEIGHT = -1;
+    private final long leftBoardEdge = 1L | 1L << 8 | 1L << 16 | 1L << 24 | 1L << 32 | 1L << 40 | 1L << 48 | 1L << 56;
+    private final long rightBoardEdge = 1L << 7 | 1L << 15 | 1L << 23 | 1L << 31 | 1L << 39 | 1L << 47 | 1L << 55 | 1L << 63;
+    private final long sixteenCenterSquares = 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36;
+
+    private static final int KNIGHT_MIDDLE_WEIGHT = 1;
+    private static final int KNIGHT_SEMI_OUTPOST_WEIGHT = 1;
+    private static final int KNIGHT_OUTPOST_WEIGHT = 3;
+    private static final int KNIGHT_EDGE_WEIGHT = 2;
 
     public Heuristics(Chessboard chessboard, int color) {
         this.color = color;
@@ -158,65 +166,46 @@ public class Heuristics {
         }
         return score;
     }
-    public static int tables(Chessboard chessboard, int color) {
-        long[] pieceBitboards = getPositionFromChessboard(chessboard);
-        // tables are stored as an int[] with 64 entries, one for each square
+
+    public int knightPositioning() {
+        // knight on the edge of the board is bad, knight in the middle is good, if knight protected by pawn its good
         int score = 0;
-        if (color == WHITE) {
-            for (int i = 0; i < 64; i++) {
-                //pawn table
-                if ((pieceBitboards[0] & (1L << i)) != 0) {
-                    score += PieceTables.pawnTable[i];
-                }
-                //knight table
-                if ((pieceBitboards[1] & (1L << i)) != 0) {
-                    score += PieceTables.knightTable[i];
-                }
-                //bishop table
-                if ((pieceBitboards[2] & (1L << i)) != 0) {
-                    score += PieceTables.bishopTable[i];
-                }
-                //rook table
-                if ((pieceBitboards[3] & (1L << i)) != 0) {
-                    score += PieceTables.rookTable[i];
-                }
-                //queen table
-                if ((pieceBitboards[4] & (1L << i)) != 0) {
-                    score += PieceTables.queenTable[i];
-                }
-                //king table
-                if ((pieceBitboards[5] & (1L << i)) != 0) {
-                    score += PieceTables.kingTable[i];
-                }
-            }
-        } else {
-            for (int i = 0; i < 64; i++) {
-                //pawn table
-                if ((pieceBitboards[6] & (1L << i)) != 0) {
-                    score += PieceTables.pawnTableBlack[63-i];
-                }
-                //knight table
-                if ((pieceBitboards[7] & (1L << i)) != 0) {
-                    score += PieceTables.knightTableBlack[63-i];
-                }
-                //bishop table
-                if ((pieceBitboards[8] & (1L << i)) != 0) {
-                    score += PieceTables.bishopTableBlack[63-i];
-                }
-                //rook table
-                if ((pieceBitboards[9] & (1L << i)) != 0) {
-                    score += PieceTables.rookTableBlack[63-i];
-                }
-                //queen table
-                if ((pieceBitboards[10] & (1L << i)) != 0) {
-                    score += PieceTables.queenTableBlack[63-i];
-                }
-                //king table
-                if ((pieceBitboards[11] & (1L << i)) != 0) {
-                    score += PieceTables.kingTableBlack[63-i];
-                }
-            }
-        }
-        return score/10;
+
+        score += knightEdgeCheck();
+        score += knightOutpostCheck();
+
+
+        return score;
     }
+
+    private int knightOutpostCheck() {
+        //give score based on given color knights position on the board
+        int score = 0;
+        long centerKnights = Long.bitCount(sixteenCenterSquares & (color == WHITE ? whiteKnights : blackKnights));
+        //check if the knight is protected by a pawn, if not, give semi outpost score, if yes, give full outpost score
+
+        long defendedSquares = getDefendedByPawnSquares();
+        //give score per knight in center defended by pawn/not defended by pawn
+        score += (centerKnights & defendedSquares) * KNIGHT_OUTPOST_WEIGHT;
+        score += (centerKnights & ~defendedSquares) * KNIGHT_SEMI_OUTPOST_WEIGHT;
+        return score;
+    }
+
+    private long getDefendedByPawnSquares() {
+        long defendedSquares = 0L;
+        if (color == WHITE) {
+            defendedSquares = (whitePawns & ~leftBoardEdge) << 7;
+            defendedSquares |= (whitePawns & ~rightBoardEdge) << 9;
+        } else {
+            defendedSquares = (blackPawns & ~leftBoardEdge) >> 9;
+            defendedSquares |= (blackPawns & ~rightBoardEdge) >> 7;
+        }
+        return defendedSquares;
+    }
+
+
+    private int knightEdgeCheck() {
+        return (Long.bitCount(rightBoardEdge & (color == WHITE? whiteKnights : blackKnights)) * -KNIGHT_EDGE_WEIGHT) + (Long.bitCount(leftBoardEdge & (color == WHITE? whiteKnights : blackKnights)) * -KNIGHT_EDGE_WEIGHT);
+    }
+
 }

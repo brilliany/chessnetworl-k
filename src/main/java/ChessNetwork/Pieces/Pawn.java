@@ -10,7 +10,7 @@ public class Pawn {
 
 
 
-    public static ArrayList<Move> getMoves(int x, int y, int color, Chessboard chessboard, ArrayList<Move> moves) {
+    public static void getMoves(int x, int y, int color, Chessboard chessboard, ArrayList<Move> moves) {
         //Color is 1 for white and -1 for black, so we can use it to determine the direction of the pawn
         //shift bitboard one and step in the direction of the pawn (*direction to get the right direction)
         int direction = -color;
@@ -55,7 +55,7 @@ public class Pawn {
                     moves.add(new Move(x, y, x, y + direction, PAWN*BLACK));
                     //if the pawn hasnt moved, check if the two step move is empty
                     if (y==1)
-                        if ((pieces & twoStep) == 0) {
+                        if ((pieces & twoStep ) == 0 && (opponentPieces & twoStep) == 0) {
                             moves.add(new Move(x, y, x, y + direction * 2, PAWN*BLACK));
                         }
                 }
@@ -76,7 +76,6 @@ public class Pawn {
             }
         }
 
-        return moves;
     }
 
     private static void enPassantCheck(int x, int y, int color, ArrayList<Move> moves, long twoStep, long whitePiecesPrev) {

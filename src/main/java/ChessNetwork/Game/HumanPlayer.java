@@ -5,8 +5,10 @@ import ChessNetwork.Chessboard;
 
 public class HumanPlayer extends Player {
 
-    public HumanPlayer() {
+    public HumanPlayer(int color, Chessboard chessboard) {
         super();
+        this.chessBoard = chessboard;
+        this.color = color;
     }
 
     @Override
@@ -15,8 +17,7 @@ public class HumanPlayer extends Player {
     }
 
     @Override
-    public void init(ChessGame chessGame, int color) {
+    public void init(ChessGame chessGame) {
         this.chessGame = chessGame;
-        this.color = color;
     }
 }

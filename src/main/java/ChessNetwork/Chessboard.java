@@ -232,41 +232,57 @@ public class Chessboard {
         int newY = move.getToY();
 
         // Handle castling
-        if (piece == WHITE * KING && x == 4 && y == 0) {
-            if (newX == 2 && newY == 0 && getCastleRights(WHITE, QUEEN_SIDE)) {
+        if (piece == WHITE * KING && x == 4 && y == 7) {
+            if (newX == 2 && newY == 7 && getCastleRights(WHITE, QUEEN_SIDE)) {
                 // Queen-side castling
-                whiteKings &= ~(1L << 4);
-                whiteKings |= (1L << 2);
-                whiteRooks &= ~(1L << 0);
-                whiteRooks |= (1L << 3);
-                whitePieces &= ~(1L << 4);
-                whitePieces |= (1L << 2) | (1L << 3);
-            } else if (newX == 6 && newY == 0 && getCastleRights(WHITE, KING_SIDE)) {
+                whiteKings &= ~(1L << 60);
+                whiteKings |= (1L << 58);
+                whiteRooks &= ~(1L << 56);
+                whiteRooks |= (1L << 59);
+                whitePieces &= ~(1L << 60);
+                whitePieces &= ~(1L << 56);
+                whitePieces |= (1L << 58) | (1L << 59);
+                // Save the previous board state before modifying it
+                savePosition();
+                return;
+            } else if (newX == 6 && newY == 7 && getCastleRights(WHITE, KING_SIDE)) {
                 // King-side castling
-                whiteKings &= ~(1L << 4);
-                whiteKings |= (1L << 6);
-                whiteRooks &= ~(1L << 7);
-                whiteRooks |= (1L << 5);
-                whitePieces &= ~(1L << 4);
-                whitePieces |= (1L << 6) | (1L << 5);
+                whiteKings &= ~(1L << 60);
+                whiteKings |= (1L << 62);
+                whiteRooks &= ~(1L << 63);
+                whiteRooks |= (1L << 61);
+                whitePieces &= ~(1L << 60);
+                whitePieces &= ~(1L << 63);
+                whitePieces |= (1L << 62) | (1L << 61);
+                // Save the previous board state before modifying it
+                savePosition();
+                return;
             }
-        } else if (piece == BLACK * KING && x == 4 && y == 7) {
-            if (newX == 2 && newY == 7 && getCastleRights(BLACK, QUEEN_SIDE)) {
+        } else if (piece == BLACK * KING && x == 4 && y == 0) {
+            if (newX == 2 && newY == 0 && getCastleRights(BLACK, QUEEN_SIDE)) {
                 // Queen-side castling
-                blackKings &= ~(1L << 60);
-                blackKings |= (1L << 58);
-                blackRooks &= ~(1L << 56);
-                blackRooks |= (1L << 59);
-                blackPieces &= ~(1L << 60);
-                blackPieces |= (1L << 58) | (1L << 59);
-            } else if (newX == 6 && newY == 7 && getCastleRights(BLACK, KING_SIDE)) {
+                blackKings &= ~(1L << 4);
+                blackKings |= (1L << 2);
+                blackRooks &= ~(1L << 0);
+                blackRooks |= (1L << 3);
+                blackPieces &= ~(1L << 4);
+                blackPieces &= ~(1L << 0);
+                blackPieces |= (1L << 2) | (1L << 3);
+                // Save the previous board state before modifying it
+                savePosition();
+                return;
+            } else if (newX == 6 && newY == 0 && getCastleRights(BLACK, KING_SIDE)) {
                 // King-side castling
-                blackKings &= ~(1L << 60);
-                blackKings |= (1L << 62);
-                blackRooks &= ~(1L << 63);
-                blackRooks |= (1L << 61);
-                blackPieces &= ~(1L << 60);
-                blackPieces |= (1L << 62) | (1L << 61);
+                blackKings &= ~(1L << 4);
+                blackKings |= (1L << 6);
+                blackRooks &= ~(1L << 7);
+                blackRooks |= (1L << 5);
+                blackPieces &= ~(1L << 4);
+                blackPieces &= ~(1L << 7);
+                blackPieces |= (1L << 6) | (1L << 5);
+                // Save the previous board state before modifying it
+                savePosition();
+                return;
             }
         }
 
@@ -277,12 +293,18 @@ public class Chessboard {
             whiteQueens |= (1L << newY * 8 + newX);
             whitePieces &= ~(1L << y * 8 + x);
             whitePieces |= (1L << newY * 8 + newX);
+            // Save the previous board state before modifying it
+            savePosition();
+            return;
         } else if (piece == BLACK * PAWN && newY == 7) {
             // Promote black pawn to queen
             blackPawns &= ~(1L << y * 8 + x);
             blackQueens |= (1L << newY * 8 + newX);
             blackPieces &= ~(1L << y * 8 + x);
             blackPieces |= (1L << newY * 8 + newX);
+            // Save the previous board state before modifying it
+            savePosition();
+            return;
         } else {
 // Update the bitboards to reflect the move and capture
             if ((whitePawns & (1L << y * 8 + x)) != 0) {
@@ -405,21 +427,6 @@ public class Chessboard {
                 whiteKings |= (1L << newY * 8 + newX);
                 whitePieces &= ~(1L << y * 8 + x);
                 whitePieces |= (1L << newY * 8 + newX);
-                if (Math.abs(x - newX) == 2) {
-                    if (x < newX) {
-// King-side castling
-                        whiteRooks &= ~(1L << 7);
-                        whiteRooks |= (1L << 5);
-                        whitePieces &= ~(1L << 7);
-                        whitePieces |= (1L << 5);
-                    } else {
-// Queen-side castling
-                        whiteRooks &= ~(1L << 0);
-                        whiteRooks |= (1L << 3);
-                        whitePieces &= ~(1L << 0);
-                        whitePieces |= (1L << 3);
-                    }
-                }
                 if ((blackPieces & (1L << newY * 8 + newX)) != 0) {
                     // Capturing black piece
                     blackPieces &= ~(1L << newY * 8 + newX);
@@ -559,21 +566,6 @@ public class Chessboard {
                 blackKings |= (1L << newY * 8 + newX);
                 blackPieces &= ~(1L << y * 8 + x);
                 blackPieces |= (1L << newY * 8 + newX);
-                if (Math.abs(x - newX) == 2) {
-                    if (x < newX) {
-// King-side castling
-                        blackRooks &= ~(1L << 7);
-                        blackRooks |= (1L << 5);
-                        blackPieces &= ~(1L << 7);
-                        blackPieces |= (1L << 5);
-                    } else {
-// Queen-side castling
-                        blackRooks &= ~(1L << 0);
-                        blackRooks |= (1L << 3);
-                        blackPieces &= ~(1L << 0);
-                        blackPieces |= (1L << 3);
-                    }
-                }
                 if ((whitePieces & (1L << newY * 8 + newX)) != 0) {
                     // Capturing white piece
                     whitePieces &= ~(1L << newY * 8 + newX);

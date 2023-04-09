@@ -1,10 +1,10 @@
 package ChessNetwork;
 
-import ChessNetwork.Game.HumanPlayer;
 import ChessNetwork.Game.Player;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static ChessNetwork.BoardUtils.*;
 
@@ -13,6 +13,7 @@ public class ChessGame {
 
     Player player1;
     Player player2;
+    MoveListener listener;
     private final List<ChessGameListener> gameListeners = new ArrayList<>();
 
     //then add a method to add a listener
@@ -32,7 +33,13 @@ public class ChessGame {
         System.out.println("Starting game");
     // use player.awaitMove() and then wait for moveGenerator.addMoveListener() to be called
         //there has to always be a human, so the human starts the game
-        chessboard.addMoveListener(move -> {
+        AtomicInteger moveCount = new AtomicInteger();
+        listener = chessboard.addMoveListener(move -> {
+            if (moveCount.get() >= 175) {
+                endGame("draw", 0);
+                callGameEndListeners("draw", 0);
+                return;
+            }
             if (gameEnded()) {
                 System.out.println("Game ended");
                 return;
@@ -42,28 +49,37 @@ public class ChessGame {
             } else {
                 player1.awaitMove( WHITE, chessboard);
             }
+            System.out.println("Move: " + moveCount.get());
+            moveCount.getAndIncrement();
         });
         System.out.println("Player 1: " + player1.getClass().getSimpleName());
-        if (player1 instanceof HumanPlayer) {
-            player1.init(this, WHITE);
-            player2.init(this, BLACK);
+        if (player1.getColor() == WHITE) {
+            player1.init(this);
+            player2.init(this);
             player1.awaitMove(WHITE, chessboard);
         } else {
-            player1.init(this, WHITE);
-            player2.init(this, BLACK);
+            player1.init(this);
+            player2.init(this);
             player2.awaitMove( BLACK, chessboard);
         }
     }
 
+    private void endGame(String reason, int winner) {
+        //forcefully end the game
+        callGameEndListeners(reason, winner);
+        chessboard.removeMoveListener(listener);
+    }
 
 
     private boolean gameEnded() {
         if (MoveGenerator.isCheckmate(BLACK,chessboard) || MoveGenerator.isCheckmate(WHITE,chessboard)) {
             callGameEndListeners("checkmate", 1);
+            chessboard.removeMoveListener(listener);
             return true;
         }
         if (MoveGenerator.isStalemate(BLACK, chessboard) || MoveGenerator.isStalemate(WHITE, chessboard)) {
             callGameEndListeners("stalemate", 0);
+            chessboard.removeMoveListener(listener);
             return true;
         }
         return false;

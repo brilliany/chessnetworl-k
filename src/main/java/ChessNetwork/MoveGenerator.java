@@ -64,12 +64,7 @@ public class MoveGenerator {
         // Check if the given color is in check
         if (isCheck(color, chessboard)) {
             List<Move> allMoves = getAllMoves(color, chessboard);
-            for (Move move : allMoves) {
-                if (!putsKingInCheck(move, chessboard)) {
-                    return false;
-                }
-            }
-            return true;
+            return allMoves.isEmpty();
         }
         return false;
     }
@@ -78,12 +73,7 @@ public class MoveGenerator {
         // Check if the given color is not in check
         if (!isCheck(color, chessboard)) {
             List<Move> allMoves = getAllMoves(color, chessboard);
-            for (Move move : allMoves) {
-                if (!putsKingInCheck(move, chessboard)) {
-                    return false;
-                }
-            }
-            return true;
+            return allMoves.isEmpty();
         }
         return false;
     }

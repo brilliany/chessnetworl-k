@@ -9,6 +9,7 @@ public class BotPlayer extends Player {
 
     public BotPlayer(int depth, int color, Chessboard chessboard) {
         super();
+        this.chessBoard = chessboard;
         this.bot = new ChessBot.ChessBot(depth, color);
     }
 
@@ -25,9 +26,8 @@ public class BotPlayer extends Player {
 
 
     @Override
-    public void init(ChessGame chessGame, int color) {
+    public void init(ChessGame chessGame) {
         this.chessGame = chessGame;
-        this.color = color;
     }
 
 
