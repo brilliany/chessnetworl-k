@@ -2,6 +2,7 @@ package ChessBot;
 
 import ChessNetwork.Chessboard;
 
+import static ChessNetwork.BoardUtils.BLACK;
 import static ChessNetwork.BoardUtils.WHITE;
 
 public class Heuristics {
@@ -29,9 +30,9 @@ public class Heuristics {
     private static final int DOUBLED_PAWN_WEIGHT = -1;
     private final long leftBoardEdge = 1L | 1L << 8 | 1L << 16 | 1L << 24 | 1L << 32 | 1L << 40 | 1L << 48 | 1L << 56;
     private final long rightBoardEdge = 1L << 7 | 1L << 15 | 1L << 23 | 1L << 31 | 1L << 39 | 1L << 47 | 1L << 55 | 1L << 63;
-    private final long sixteenCenterSquares = 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36;
+    private final long sixteenCenterSquares = 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36 | 1L << 19 | 1L << 20 | 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36 | 1L << 19 | 1L << 20 | 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36;
+    private final long fourCenterSquares = 1L << 27 | 1L << 28 | 1L << 35 | 1L << 36;
 
-    private static final int KNIGHT_MIDDLE_WEIGHT = 1;
     private static final int KNIGHT_SEMI_OUTPOST_WEIGHT = 1;
     private static final int KNIGHT_OUTPOST_WEIGHT = 3;
     private static final int KNIGHT_EDGE_WEIGHT = 2;
@@ -59,11 +60,11 @@ public class Heuristics {
         //3 points for having two pawns in the middle of the board
         //1 point for having one pawn in the middle of the board, 0 points for having none obviously
         int score = 0;
-        long middlePawns = (whitePawns & 0b0000000011100000L) | (blackPawns & 0b0000000011100000L);
-        if (Long.bitCount(middlePawns) == 2) {
-            score += TWO_MIDDLE_PAWNS_WEIGHT;
-        } else if (Long.bitCount(middlePawns) == 1) {
-            score += TWO_MIDDLE_PAWNS_WEIGHT / 2;
+        //check for pawns in the four center squares
+        if (color == WHITE) {
+            score += Long.bitCount(whitePawns & fourCenterSquares) * TWO_MIDDLE_PAWNS_WEIGHT;
+        } else {
+            score += Long.bitCount(blackPawns & fourCenterSquares) * TWO_MIDDLE_PAWNS_WEIGHT;
         }
         return score;
     }
@@ -111,21 +112,26 @@ public class Heuristics {
     public int castlingScore() {
         int score = 0;
         if (color == WHITE) {
-            long wKpos = whiteKing & (1L << 6);
-            long wRpos = whiteRooks & (1L << 7);
-
-            if (wKpos != 0 && wRpos != 0) {
+            long wKposShort = whiteKing & (1L << 62);
+            long wRposShort = whiteRooks & (1L << 61);
+            long wKposLong = whiteKing & (1L << 58);
+            long wRposLong = whiteRooks & (1L << 59);
+            if (wKposShort != 0 && wRposShort != 0) {
                 score += CASTLING_WEIGHT;
             }
-            if ((whiteKing & (1L << 2)) != 0 && (whiteRooks & (1L << 0)) != 0) {
+            if (wKposLong != 0 && wRposLong != 0) {
                 score += CASTLING_WEIGHT;
             }
         } else {
-            if ((blackKing & (1L << 62)) != 0 && (blackRooks & (1L << 63)) != 0) {
-                score -= CASTLING_WEIGHT;
+            long bKposShort = blackKing & (1L << 6);
+            long bRposShort = blackRooks & (1L << 5);
+            long bKposLong = blackKing & (1L << 2);
+            long bRposLong = blackRooks & (1L << 3);
+            if (bKposShort != 0 && bRposShort != 0) {
+                score += CASTLING_WEIGHT;
             }
-            if ((blackKing & (1L << 58)) != 0 && (blackRooks & (1L << 56)) != 0) {
-                score -= CASTLING_WEIGHT;
+            if (bKposLong != 0 && bRposLong != 0) {
+                score += CASTLING_WEIGHT;
             }
         }
         return score;
@@ -136,24 +142,51 @@ public class Heuristics {
         int score = 0;
         //check formations for each square
         if (color == WHITE) {
-            for (int i = 0; i < 64; i++) {
-                if ((whitePawns & (1L << i)) != 0) {
-                    score += doubledPawnCheck(score, i);
-                    score += isolatedPawnCheck(score, i);
-                }
-            }
+            score += isolatedPawnCheck(WHITE);
+        } else {
+            score += isolatedPawnCheck(BLACK);
         }
         return score;
 }
 
-    private int isolatedPawnCheck(int score, int i) {
-        //this method checks all the isolated pawns and returns the score for each isolated pawn
-        //check the squares around the pawn for pawns, since the pawn isnt isolated if there is a pawn on the row beside that can move to defend it
-        long leftRowMask = (1L << i-1) | (1L << i-8) | (1L << i-7) | (1L << i-9);
-        long rightRowMask = (1L << i+1) | (1L << i-8) | (1L << i-7) | (1L << i-9);
-        if ((whitePawns & leftRowMask) == 0 && (whitePawns & rightRowMask) == 0) {
-            score += ISOLATED_PAWN_WEIGHT;
+    private int isolatedPawnCheck(int color) {
+        int score = 0;
+        if (color == WHITE) {
+            //check if the pawn is isolated using the left and right rows
+            //get left of each pawn that is not on the left edge
+            long leftRow = whitePawns & ~leftBoardEdge;
+            //get right of each pawn that is not on the right edge
+            long rightRow = whitePawns & ~rightBoardEdge;
+            //shift left and right one square
+            leftRow = leftRow << 1;
+            //all squares under and above the pawn
+            leftRow = leftRow | (leftRow << 8) | (leftRow << 16) | (leftRow << 24) | (leftRow << 32) | (leftRow << 40) | (leftRow << 48) | (leftRow << 56);
+            rightRow = rightRow >> 1;
+            rightRow = rightRow | (rightRow << 8) | (rightRow << 16) | (rightRow << 24) | (rightRow << 32) | (rightRow << 40) | (rightRow << 48) | (rightRow << 56);
+
+            //check if the pawn is isolated
+            if ((whitePawns & leftRow) == 0 && (whitePawns & rightRow) == 0) {
+                score += ISOLATED_PAWN_WEIGHT;
+            }
+        } else {
+            //check if the pawn is isolated using the left and right rows
+            //get left of each pawn that is not on the left edge
+            long leftRow = blackPawns & ~leftBoardEdge;
+            //get right of each pawn that is not on the right edge
+            long rightRow = blackPawns & ~rightBoardEdge;
+            //shift left and right one square
+            leftRow = leftRow << 1;
+            //all squares under and above the pawn
+            leftRow = leftRow | (leftRow << 8) | (leftRow << 16) | (leftRow << 24) | (leftRow << 32) | (leftRow << 40) | (leftRow << 48) | (leftRow << 56);
+            rightRow = rightRow >> 1;
+            rightRow = rightRow | (rightRow << 8) | (rightRow << 16) | (rightRow << 24) | (rightRow << 32) | (rightRow << 40) | (rightRow << 48) | (rightRow << 56);
+
+            //check if the pawn is isolated
+            if ((blackPawns & leftRow) == 0 && (blackPawns & rightRow) == 0) {
+                score += ISOLATED_PAWN_WEIGHT;
+            }
         }
+
         return score;
     }
 

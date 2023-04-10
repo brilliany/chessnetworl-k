@@ -45,11 +45,12 @@ public class ChessGame {
                 return;
             }
             if (getColor(move.getPiece()) == player1.getColor()) {
-                player2.awaitMove(BLACK, chessboard);
+                System.out.println("Awaiting move from player 2");
+                player2.awaitMove(-getColor(move.getPiece()), chessboard);
             } else {
-                player1.awaitMove( WHITE, chessboard);
+                System.out.println("Awaiting move from player 1");
+                player1.awaitMove(-getColor(move.getPiece()), chessboard);
             }
-            System.out.println("Move: " + moveCount.get());
             moveCount.getAndIncrement();
         });
         System.out.println("Player 1: " + player1.getClass().getSimpleName());
@@ -60,7 +61,7 @@ public class ChessGame {
         } else {
             player1.init(this);
             player2.init(this);
-            player2.awaitMove( BLACK, chessboard);
+            player2.awaitMove(WHITE, chessboard);
         }
     }
 

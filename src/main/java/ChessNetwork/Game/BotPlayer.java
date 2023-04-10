@@ -10,7 +10,7 @@ public class BotPlayer extends Player {
     public BotPlayer(int depth, int color, Chessboard chessboard) {
         super();
         this.chessBoard = chessboard;
-        this.bot = new ChessBot.ChessBot(depth, color);
+        this.bot = new ChessBot.ChessBot(chessboard, depth, color);
     }
 
     public Move getMove(int color, Chessboard chessboard) {

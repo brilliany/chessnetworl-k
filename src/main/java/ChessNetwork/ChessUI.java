@@ -24,7 +24,7 @@ import static ChessNetwork.BoardUtils.*;
 
 public class ChessUI extends Application {
 
-    private final int DEPTH = 8;
+    private final int DEPTH = 5;
     private GridPane rootNode;
     @Getter
     private GridPane board;
@@ -136,8 +136,8 @@ public class ChessUI extends Application {
         // engine is ChessBot.class
         playAgainstEngineButton.setOnAction(event -> {
             chessboard.resetChessBoard();
-            Player engine = new BotPlayer(DEPTH, WHITE, chessboard);
-            Player humanPlayer = new HumanPlayer(BLACK, chessboard);
+            Player engine = new BotPlayer(DEPTH, BLACK, chessboard);
+            Player humanPlayer = new HumanPlayer(WHITE, chessboard);
 
             updateChessBoard(chessboard);
                 ChessGame game = new ChessGame(humanPlayer, engine, chessboard);
@@ -274,7 +274,6 @@ public class ChessUI extends Application {
     }
 
     private void updateChessBoard(Chessboard moveGenerator) {
-        System.out.println("update chessboard");
         //use the queue to update the board without producing concurrent modification exception
                 unhighlight();
                 board.getChildren().removeIf(node -> node instanceof ImageView);
