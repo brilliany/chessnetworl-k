@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Chess Board</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <nav>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <div class="chessboard-header">
+    <div class="icon-box" id="engine-icon-box">
+      <div class="small-icon" id="engine-icon">
+        <img src="./other/engine-icon.png" alt="engine-icon">
+      </div>
+      <div class="icon-text" id="engine-name">
+        <p>Engine</p>
+      </div>
+      <div class="icon-footer" id="engine-thinking" style="display: none">
+        <p>Engine is thinking</p>
+      </div>
+    </div>
+  </div>
+  <section class="chessboard-container">
+    <div class="chessboard" id="board">
+      <div class="row" id="row0">
+        <div class="square white" id="0"><div class="piece"></div></div>
+        <div class="square black" id="1"><div class="piece"></div></div>
+        <div class="square white" id="2"><div class="piece"></div></div>
+        <div class="square black" id="3"><div class="piece"></div></div>
+        <div class="square white" id="4"><div class="piece"></div></div>
+        <div class="square black" id="5"><div class="piece"></div></div>
+        <div class="square white" id="6"><div class="piece"></div></div>
+        <div class="square black" id="7"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row1">
+        <div class="square black" id="8"><div class="piece"></div></div>
+        <div class="square white" id="9"><div class="piece"></div></div>
+        <div class="square black" id="10"><div class="piece"></div></div>
+        <div class="square white" id="11"><div class="piece"></div></div>
+        <div class="square black" id="12"><div class="piece"></div></div>
+        <div class="square white" id="13"><div class="piece"></div></div>
+        <div class="square black" id="14"><div class="piece"></div></div>
+        <div class="square white" id="15"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row2">
+        <div class="square white" id="16"><div class="piece"></div></div>
+        <div class="square black" id="17"><div class="piece"></div></div>
+        <div class="square white" id="18"><div class="piece"></div></div>
+        <div class="square black" id="19"><div class="piece"></div></div>
+        <div class="square white" id="20"><div class="piece"></div></div>
+        <div class="square black" id="21"><div class="piece"></div></div>
+        <div class="square white" id="22"><div class="piece"></div></div>
+        <div class="square black" id="23"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row3">
+        <div class="square black" id="24"><div class="piece"></div></div>
+        <div class="square white" id="25"><div class="piece"></div></div>
+        <div class="square black" id="26"><div class="piece"></div></div>
+        <div class="square white" id="27"><div class="piece"></div></div>
+        <div class="square black" id="28"><div class="piece"></div></div>
+        <div class="square white" id="29"><div class="piece"></div></div>
+        <div class="square black" id="30"><div class="piece"></div></div>
+        <div class="square white" id="31"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row4">
+        <div class="square white" id="32"><div class="piece"></div></div>
+        <div class="square black" id="33"><div class="piece"></div></div>
+        <div class="square white" id="34"><div class="piece"></div></div>
+        <div class="square black" id="35"><div class="piece"></div></div>
+        <div class="square white" id="36"><div class="piece"></div></div>
+        <div class="square black" id="37"><div class="piece"></div></div>
+        <div class="square white" id="38"><div class="piece"></div></div>
+        <div class="square black" id="39"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row5">
+        <div class="square black" id="40"><div class="piece"></div></div>
+        <div class="square white" id="41"><div class="piece"></div></div>
+        <div class="square black" id="42"><div class="piece"></div></div>
+        <div class="square white" id="43"><div class="piece"></div></div>
+        <div class="square black" id="44"><div class="piece"></div></div>
+        <div class="square white" id="45"><div class="piece"></div></div>
+        <div class="square black" id="46"><div class="piece"></div></div>
+        <div class="square white" id="47"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row6">
+        <div class="square white" id="48"><div class="piece"></div></div>
+        <div class="square black" id="49"><div class="piece"></div></div>
+        <div class="square white" id="50"><div class="piece"></div></div>
+        <div class="square black" id="51"><div class="piece"></div></div>
+        <div class="square white" id="52"><div class="piece"></div></div>
+        <div class="square black" id="53"><div class="piece"></div></div>
+        <div class="square white" id="54"><div class="piece"></div></div>
+        <div class="square black" id="55"><div class="piece"></div></div>
+      </div>
+      <div class="row" id="row7">
+        <div class="square black" id="56"><div class="piece"></div></div>
+        <div class="square white" id="57"><div class="piece"></div></div>
+        <div class="square black" id="58"><div class="piece"></div></div>
+        <div class="square white" id="59"><div class="piece"></div></div>
+        <div class="square black" id="60"><div class="piece"></div></div>
+        <div class="square white" id="61"><div class="piece"></div></div>
+        <div class="square black" id="62"><div class="piece"></div></div>
+        <div class="square white" id="63"><div class="piece"></div></div>
+      </div>
+    </div>
+  </section>
+  <div class="chessboard-footer">
+    <div class="icon-box" id="user-icon-box">
+      <div class="small-icon" id="user-icon"></div>
+      <img src="./other/default-icon.png" alt="user-icon">
+      <div class="icon-text" id="user-name">
+        <p>User</p>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="js/chessboard.js"></script>
+</body>
+</html>
+<!--
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Chess Board</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+&lt;!&ndash; icon box contains user icon and name &ndash;&gt;
+<div class="top-icon-box" id="engine-icon-box" >
+  <div class="small-icon" id="engine-icon">
+    <img src= "./other/engine-icon.png" alt="engine-icon">
+  </div>
+  <div class="icon-text" id="engine-name">
+    <h1>Engine</h1>
+  </div>
+  <div class="icon-footer" id="engine-thinking" style="display: none">
+    <h1>Engine is thinking</h1>
+  </div>
+</div>
+<div class="chessboard" id="board">
+  <div class="row" id="row0">
+    <div class="square white" id="0"><div class="piece"></div></div>
+    <div class="square black" id="1"><div class="piece"></div></div>
+    <div class="square white" id="2"><div class="piece"></div></div>
+    <div class="square black" id="3"><div class="piece"></div></div>
+    <div class="square white" id="4"><div class="piece"></div></div>
+    <div class="square black" id="5"><div class="piece"></div></div>
+    <div class="square white" id="6"><div class="piece"></div></div>
+    <div class="square black" id="7"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row1">
+    <div class="square black" id="8"><div class="piece"></div></div>
+    <div class="square white" id="9"><div class="piece"></div></div>
+    <div class="square black" id="10"><div class="piece"></div></div>
+    <div class="square white" id="11"><div class="piece"></div></div>
+    <div class="square black" id="12"><div class="piece"></div></div>
+    <div class="square white" id="13"><div class="piece"></div></div>
+    <div class="square black" id="14"><div class="piece"></div></div>
+    <div class="square white" id="15"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row2">
+    <div class="square white" id="16"><div class="piece"></div></div>
+    <div class="square black" id="17"><div class="piece"></div></div>
+    <div class="square white" id="18"><div class="piece"></div></div>
+    <div class="square black" id="19"><div class="piece"></div></div>
+    <div class="square white" id="20"><div class="piece"></div></div>
+    <div class="square black" id="21"><div class="piece"></div></div>
+    <div class="square white" id="22"><div class="piece"></div></div>
+    <div class="square black" id="23"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row3">
+    <div class="square black" id="24"><div class="piece"></div></div>
+    <div class="square white" id="25"><div class="piece"></div></div>
+    <div class="square black" id="26"><div class="piece"></div></div>
+    <div class="square white" id="27"><div class="piece"></div></div>
+    <div class="square black" id="28"><div class="piece"></div></div>
+    <div class="square white" id="29"><div class="piece"></div></div>
+    <div class="square black" id="30"><div class="piece"></div></div>
+    <div class="square white" id="31"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row4">
+    <div class="square white" id="32"><div class="piece"></div></div>
+    <div class="square black" id="33"><div class="piece"></div></div>
+    <div class="square white" id="34"><div class="piece"></div></div>
+    <div class="square black" id="35"><div class="piece"></div></div>
+    <div class="square white" id="36"><div class="piece"></div></div>
+    <div class="square black" id="37"><div class="piece"></div></div>
+    <div class="square white" id="38"><div class="piece"></div></div>
+    <div class="square black" id="39"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row5">
+    <div class="square black" id="40"><div class="piece"></div></div>
+    <div class="square white" id="41"><div class="piece"></div></div>
+    <div class="square black" id="42"><div class="piece"></div></div>
+    <div class="square white" id="43"><div class="piece"></div></div>
+    <div class="square black" id="44"><div class="piece"></div></div>
+    <div class="square white" id="45"><div class="piece"></div></div>
+    <div class="square black" id="46"><div class="piece"></div></div>
+    <div class="square white" id="47"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row6">
+    <div class="square white" id="48"><div class="piece"></div></div>
+    <div class="square black" id="49"><div class="piece"></div></div>
+    <div class="square white" id="50"><div class="piece"></div></div>
+    <div class="square black" id="51"><div class="piece"></div></div>
+    <div class="square white" id="52"><div class="piece"></div></div>
+    <div class="square black" id="53"><div class="piece"></div></div>
+    <div class="square white" id="54"><div class="piece"></div></div>
+    <div class="square black" id="55"><div class="piece"></div></div>
+  </div>
+  <div class="row" id="row7">
+    <div class="square black" id="56"><div class="piece"></div></div>
+    <div class="square white" id="57"><div class="piece"></div></div>
+    <div class="square black" id="58"><div class="piece"></div></div>
+    <div class="square white" id="59"><div class="piece"></div></div>
+    <div class="square black" id="60"><div class="piece"></div></div>
+    <div class="square white" id="61"><div class="piece"></div></div>
+    <div class="square black" id="62"><div class="piece"></div></div>
+    <div class="square white" id="63"><div class="piece"></div></div>
+  </div>
+  <script src="js/chessboard.js"></script>
+</div>
+<div class="bottom-icon-box" id="user-icon-box" >
+  <div class="small-icon" id="user-icon"></div>
+  <div class="icon-text" id="user-name"></div>
+</div>
+</body>-->

@@ -5,3 +5,4 @@
 /target/maven-archiver/*
 /target/maven-status/*
 /target/untitled1-1.0-SNAPSHOT.jar
+/chessnetwork-rust/target/
