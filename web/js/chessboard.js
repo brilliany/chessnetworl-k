@@ -1,52 +1,20 @@
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';'); //split cookies by ;
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim(); //trim spaces
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) === (name + '=')) { //if cookie name is found
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); //get cookie value
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
+import * as API from './web_utils.js'
 
 //session id from cookies
-const sessionId = getCookie("session_id");
+const sessionId = API.getCookie("session_id");
 let color = 0;
 const engine_thinking_div = document.getElementById("engine-thinking");
 let savedPossibleMoves = []
 let pieces = [] // keeps track of the pieces on the board, the 'element' property might not correspond to the actual element on the board
 
 generateIcon();
+
 initialRequest(sessionId);
 function initialRequest(sessionId) {
-    // Path: /api/get-session, returns a json with the color of the player
-    // ex. { "color": "white" }
-    fetch("/api/get-session", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
-    }).then((response) => {
-        if (response.status === 200) {
-            response.json().then((data) => {
-                console.log(data);
-                color = -JSON.parse(data).opponent;
-                console.log("Color is " + color);
-                console.log("Populating board for session: " + sessionId);
-                populateBoard(sessionId);
-            });
-
-        } else {
-            alert("Could not get color");
-        }
-    });
+    let data = API.getSession(sessionId);
+    color = -data.opponent;
+    populateBoard(sessionId);
 }
 
 /**
@@ -335,11 +303,4 @@ function generateIcon() {
         text.textContent = "User" + sessionId;
         container.appendChild(text);
     }
-    // const container = document.getElementById("user-icon")
-    // console.log(container);
-    // const icon = document.createElement("img");
-    // icon.setAttribute("src", "./other/default-icon.png");
-    // icon.setAttribute("alt", "user-icon");
-    // container.appendChild(icon);
-
 }
