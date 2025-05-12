@@ -24,9 +24,9 @@ export async function getSession(sessionID) {
             "Content-Type": "application/json",
         },
         credentials: "include",
-    }).then((response) => {
+    }).then(async (response) => {
         if (response.status === 200) {
-            response.json().then((raw) => {
+            await response.json().then((raw) => {
                 data = JSON.parse(raw);
             });
         } else {

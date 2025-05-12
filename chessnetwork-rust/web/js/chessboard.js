@@ -1,5 +1,4 @@
-
-import * as API from './web_utils.js'
+import * as API from "/js/web_utils.js"
 
 //session id from cookies
 const sessionId = API.getCookie("session_id");
@@ -10,9 +9,10 @@ let pieces = [] // keeps track of the pieces on the board, the 'element' propert
 
 generateIcon();
 
-initialRequest(sessionId);
-function initialRequest(sessionId) {
-    let data = API.getSession(sessionId);
+await initialRequest(sessionId);
+async function initialRequest(sessionId) {
+    let data = await API.getSession(sessionId);
+    console.log(data)
     color = -data.opponent;
     populateBoard(sessionId);
 }
@@ -56,11 +56,13 @@ function populateBoard() {
     *       [empty, empty, empty, empty, empty, empty, empty, empty],
         */
             response.json().then((data) => {
-                console.log(data);
+
                 const board = JSON.parse(data).board;
+
                 for (let i = 0; i < board.length; i++) {
                     const row = board[i];
                     const rowElement = document.getElementById("row" + i);
+
                     for (let j = 0; j < row.length; j++) {
                         const piece_name = row[j];
                         const squareElement = rowElement.children[j];
@@ -89,11 +91,12 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
         pieceElement.appendChild(pieceImg);
     }
     const pieceImg = pieceElement.children[0];
-    pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
+    pieceImg.setAttribute("src", "/pieces/" + piece_name + ".png");
     pieceImg.setAttribute("alt", piece_name);
 
     let listenerFunction = null;
     //add event listener to piece if it's the player's color
+    console.log(color)
     if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
         listenerFunction = addListenerToPiece(pieceImg, piece_name, x, y);
     }
@@ -105,6 +108,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
+    console.log("adding listener to: " + piece_name)
     let listenerFunction = function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
@@ -130,20 +134,24 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
             if (response.status === 200) {
                 console.log(response);
                 response.json().then((possibleMoves) => {
-                    //possibleMoves is an array of 16 bit integers,
+                    //possibleMoves is an array of moves
                     /**
-                     * first 4 bits: from square x
-                     * second 4 bits: from square y
-                     * third 4 bits: to square x
-                     * fourth 4 bits: to square y
+                     [
+                        {
+                         from_square: <index from 0-63>,
+                        to_square: <index from 0-63>,
+                        },
+                        ...
+                     ]
                      */
                     let receivedMoves = Object.values(possibleMoves);
                     console.log("Possible moves: " + receivedMoves.length);
                     for (let i = 0; i < possibleMoves.length; i++) {
-                        const move = possibleMoves[i].bits;
-                        console.log("Possible move: " + move);
-                        const toX = (move >> 8) & 0b1111;
-                        const toY = (move >> 12) & 0b1111;
+                        const move = possibleMoves[i];
+                        const fromX = move.from_square % 8;
+                        const fromY = Math.floor(move.from_square / 8);
+                        const toX = move.to_square % 8;
+                        const toY = Math.floor(move.to_square / 8);
                         const toSquare = document.getElementById("row" + toY).children[toX];
                         toSquare.classList.add("possible-move");
                         let possibleMoveListener = function () {
@@ -258,19 +266,17 @@ function makeEngineMove() {
     }).then((response) => {
         if (response.status === 200) {
             console.log(response);
-            response.json().then((response) => {
-                //move is an unsigned 16 bit integer,
+            response.json().then((move) => {
                 /**
-                 * first 4 bits: from square x
-                 * second 4 bits: from square y
-                 * third 4 bits: to square x
-                 * fourth 4 bits: to square y
+                    {
+                     from_square: <index from 0-63>,
+                    to_square: <index from 0-63>,
+                    }
                  */
-                const move = response.bits
-                const fromX = move & 0b1111;
-                const fromY = (move >> 4) & 0b1111;
-                const toX = (move >> 8) & 0b1111;
-                const toY = (move >> 12) & 0b1111;
+                const fromX = move.from_square % 8;
+                const fromY = Math.floor(move.from_square / 8);
+                const toX = move.to_square % 8;
+                const toY = Math.floor(move.to_square / 8);
                 movePiece(fromX, fromY, toX, toY);
                 unfreezeBoard();
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);
