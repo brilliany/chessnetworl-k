@@ -1,7 +1,7 @@
-import * as API from "/js/web_utils.js"
+
 
 //session id from cookies
-const sessionId = API.getCookie("session_id");
+const sessionId = getCookie("session_id");
 let color = 0;
 const engine_thinking_div = document.getElementById("engine-thinking");
 let savedPossibleMoves = []
@@ -11,8 +11,7 @@ generateIcon();
 
 await initialRequest(sessionId);
 async function initialRequest(sessionId) {
-    let data = await API.getSession(sessionId);
-    console.log(data)
+    let data = await getSession(sessionId);
     color = -data.opponent;
     populateBoard(sessionId);
 }
@@ -56,13 +55,11 @@ function populateBoard() {
     *       [empty, empty, empty, empty, empty, empty, empty, empty],
         */
             response.json().then((data) => {
-
+                console.log(data);
                 const board = JSON.parse(data).board;
-
                 for (let i = 0; i < board.length; i++) {
                     const row = board[i];
                     const rowElement = document.getElementById("row" + i);
-
                     for (let j = 0; j < row.length; j++) {
                         const piece_name = row[j];
                         const squareElement = rowElement.children[j];
@@ -91,12 +88,11 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
         pieceElement.appendChild(pieceImg);
     }
     const pieceImg = pieceElement.children[0];
-    pieceImg.setAttribute("src", "/pieces/" + piece_name + ".png");
+    pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
     pieceImg.setAttribute("alt", piece_name);
-
+    console.log(color)
     let listenerFunction = null;
     //add event listener to piece if it's the player's color
-    console.log(color)
     if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
         listenerFunction = addListenerToPiece(pieceImg, piece_name, x, y);
     }
@@ -108,7 +104,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
-    console.log("adding listener to: " + piece_name)
+    console.log("adding listener to piece " + piece_name)
     let listenerFunction = function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
@@ -134,24 +130,20 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
             if (response.status === 200) {
                 console.log(response);
                 response.json().then((possibleMoves) => {
-                    //possibleMoves is an array of moves
+                    //possibleMoves is an array of 16 bit integers,
                     /**
-                     [
-                        {
-                         from_square: <index from 0-63>,
-                        to_square: <index from 0-63>,
-                        },
-                        ...
-                     ]
+                     * first 4 bits: from square x
+                     * second 4 bits: from square y
+                     * third 4 bits: to square x
+                     * fourth 4 bits: to square y
                      */
                     let receivedMoves = Object.values(possibleMoves);
                     console.log("Possible moves: " + receivedMoves.length);
                     for (let i = 0; i < possibleMoves.length; i++) {
-                        const move = possibleMoves[i];
-                        const fromX = move.from_square % 8;
-                        const fromY = Math.floor(move.from_square / 8);
-                        const toX = move.to_square % 8;
-                        const toY = Math.floor(move.to_square / 8);
+                        const move = possibleMoves[i].bits;
+                        console.log("Possible move: " + move);
+                        const toX = (move >> 8) & 0b1111;
+                        const toY = (move >> 12) & 0b1111;
                         const toSquare = document.getElementById("row" + toY).children[toX];
                         toSquare.classList.add("possible-move");
                         let possibleMoveListener = function () {
@@ -266,17 +258,19 @@ function makeEngineMove() {
     }).then((response) => {
         if (response.status === 200) {
             console.log(response);
-            response.json().then((move) => {
+            response.json().then((response) => {
+                //move is an unsigned 16 bit integer,
                 /**
-                    {
-                     from_square: <index from 0-63>,
-                    to_square: <index from 0-63>,
-                    }
+                 * first 4 bits: from square x
+                 * second 4 bits: from square y
+                 * third 4 bits: to square x
+                 * fourth 4 bits: to square y
                  */
-                const fromX = move.from_square % 8;
-                const fromY = Math.floor(move.from_square / 8);
-                const toX = move.to_square % 8;
-                const toY = Math.floor(move.to_square / 8);
+                const move = response.bits
+                const fromX = move & 0b1111;
+                const fromY = (move >> 4) & 0b1111;
+                const toX = (move >> 8) & 0b1111;
+                const toY = (move >> 12) & 0b1111;
                 movePiece(fromX, fromY, toX, toY);
                 unfreezeBoard();
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);
@@ -309,4 +303,46 @@ function generateIcon() {
         text.textContent = "User" + sessionId;
         container.appendChild(text);
     }
+}
+
+
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';'); //split cookies by ;
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim(); //trim spaces
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) { //if cookie name is found
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); //get cookie value
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function getSession(sessionID) {
+    // Path: /api/get-session, returns a json with the color of the player
+    // ex. { "color": "white" }
+    let data;
+    await fetch("/api/get-session", {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        credentials: "include",
+    }).then(async (response) => {
+        console.log(response)
+        if (response.status === 200) {
+            await response.json().then((raw) => {
+                data = JSON.parse(raw);
+            });
+        } else {
+            alert("Could not get color");
+        }
+    });
+    console.log(data)
+    return data;
 }

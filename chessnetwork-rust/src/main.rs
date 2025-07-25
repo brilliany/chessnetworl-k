@@ -20,13 +20,7 @@ const KING: i8 = 6;
 const EMPTY: i8 = 0;
 
 fn main() {
-    let mut chessboard = chessboard::Chessboard::default();
-    chessboard.init();
-    let mut engine = Engine::new_single(2, 1);
-    let best_move = engine.get_best_move(&mut chessboard).unwrap();
-    println!("Best move: {} {} {} {}", best_move.get_from_x(), best_move.get_from_y(), best_move.get_to_x(), best_move.get_to_y());
-
-    // setup();
+    setup();
 }
 
 // WORKING CODE:

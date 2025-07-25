@@ -28,7 +28,6 @@ pub(crate) async fn setup_single_http_server(config: Config) -> std::io::Result<
             .service(hello)
             .service(styles)
             .service(play_engine)
-            .service(play_engine_js)
             .service(chessboard_js)
             .service(populate_board)
             .service(possible_moves)
@@ -126,6 +125,7 @@ async fn play_engine(req: HttpRequest) -> impl Responder {
 }
 
 //get js/ts files
+/*
 #[get("/js/play-engine.js")]
 async fn play_engine_js() -> impl Responder {
     //respond with the web/js/play-engine.js file
@@ -133,6 +133,8 @@ async fn play_engine_js() -> impl Responder {
     let file_contents = read_file(&path);
     HttpResponse::Ok().content_type("text/javascript").body(file_contents)
 }
+*/
+
 #[get("/js/chessboard.js")]
 async fn chessboard_js() -> impl Responder {
     //respond with the web/js/chessboard.js file
@@ -141,6 +143,15 @@ async fn chessboard_js() -> impl Responder {
     HttpResponse::Ok().content_type("text/javascript").body(file_contents)
 }
 
+/*
+#[get("/js/web-utils.js")]
+async fn web_utils_js() -> impl Responder {
+    //respond with the web/js/chessboard.js file
+    let path = format!("web/js/web-utils.js");
+    let file_contents = read_file(&path);
+    HttpResponse::Ok().content_type("script/javascript").body(file_contents)
+}
+*/
 
 //api operations
 #[get("/api/populate-board")]
