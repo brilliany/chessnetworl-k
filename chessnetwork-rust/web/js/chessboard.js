@@ -1,8 +1,7 @@
 
-import * as API from './web_utils.js'
 
 //session id from cookies
-const sessionId = API.getCookie("session_id");
+const sessionId = getCookie("session_id");
 let color = 0;
 const engine_thinking_div = document.getElementById("engine-thinking");
 let savedPossibleMoves = []
@@ -10,9 +9,9 @@ let pieces = [] // keeps track of the pieces on the board, the 'element' propert
 
 generateIcon();
 
-initialRequest(sessionId);
-function initialRequest(sessionId) {
-    let data = API.getSession(sessionId);
+await initialRequest(sessionId);
+async function initialRequest(sessionId) {
+    let data = await getSession(sessionId);
     color = -data.opponent;
     populateBoard(sessionId);
 }
@@ -91,7 +90,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     const pieceImg = pieceElement.children[0];
     pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
     pieceImg.setAttribute("alt", piece_name);
-
+    console.log(color)
     let listenerFunction = null;
     //add event listener to piece if it's the player's color
     if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
@@ -105,6 +104,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
+    console.log("adding listener to piece " + piece_name)
     let listenerFunction = function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
@@ -303,4 +303,46 @@ function generateIcon() {
         text.textContent = "User" + sessionId;
         container.appendChild(text);
     }
+}
+
+
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';'); //split cookies by ;
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim(); //trim spaces
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) { //if cookie name is found
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); //get cookie value
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function getSession(sessionID) {
+    // Path: /api/get-session, returns a json with the color of the player
+    // ex. { "color": "white" }
+    let data;
+    await fetch("/api/get-session", {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        credentials: "include",
+    }).then(async (response) => {
+        console.log(response)
+        if (response.status === 200) {
+            await response.json().then((raw) => {
+                data = JSON.parse(raw);
+            });
+        } else {
+            alert("Could not get color");
+        }
+    });
+    console.log(data)
+    return data;
 }
