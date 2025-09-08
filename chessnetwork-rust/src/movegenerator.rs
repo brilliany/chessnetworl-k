@@ -9,8 +9,8 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     // color = 1 for white, -1 for black
     get_pawn_moves(&chessboard, color, &mut moves);
     get_knight_moves(&chessboard, color, &mut moves);
-    get_bishop_moves(&chessboard, color, &mut moves);
-    get_rook_moves(&chessboard, color, &mut moves);
+    get_bishop_moves(&chessboard, color, &mut moves, None);
+    get_rook_moves(&chessboard, color, &mut moves, None);
     get_queen_moves(&chessboard, color, &mut moves);
     get_king_moves(&chessboard, color, &mut moves);
 
@@ -95,8 +95,17 @@ pub(crate) fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut V
     }
 }
 
-pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
-    let bishop_mask = if color == 1 { chessboard.get_white_bishops() } else { chessboard.get_black_bishops() };
+pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
+
+    // if queen_mask is Some, use that as the bishop mask, otherwise use the bishops from the chessboard
+    let bishop_mask = if let Some(q_mask) = queen_mask {
+        queen_mask.unwrap()
+    } else if color == 1 {
+        chessboard.get_white_bishops()
+    } else {
+        chessboard.get_black_bishops()
+    };
+
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
     let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
 
@@ -106,10 +115,14 @@ pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut V
         let y = square / 8;
         let mut move_mask:u64 = 0;
         for i in 1..8 {
+            //break at board end
             if x + i > 7 || y + i > 7 { break; }
+            //add i to both x and y for this clause because were moving diagonally down
             move_mask |= 1 << (x + i + (y + i) * 8);
+            //break when we find a piece but we also include the piece
             if (all_pieces & (1 << (x + i + (y + i) * 8))) != 0 { break; }
         }
+        // repeat for rest of diagonals
         for i in 1..8 {
             if x - i < 0 || y - i < 0 { break; }
             move_mask |= 1 << (x - i + (y - i) * 8);
@@ -126,17 +139,33 @@ pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut V
             if (all_pieces & (1 << (x - i + (y + i) * 8))) != 0 { break; }
         }
 
-        move_mask &= !own_pieces;
-        for i in 0..64 {
+        move_mask &= !own_pieces; // dont eat own pieces
+        /*for i in 0..64 {
             if (move_mask & (1 << i)) != 0 {
                 moves.push(Move::new(x as u8, y as u8, i % 8 as u8, i / 8 as u8));
             }
+        }*/
+        // instead of looping through all 64 squares, we can just loop through the bits that are set in move_mask
+        let mut temp_mask = move_mask;
+        while temp_mask != 0 {
+            let lsb = temp_mask & (!temp_mask + 1);
+            let target_square = lsb.trailing_zeros() as u8;
+            moves.push(Move::new(x as u8, y as u8, target_square % 8, target_square / 8));
+            temp_mask &= temp_mask - 1;
         }
     }
 }
 
-pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
-    let rook_mask = if color == 1 { chessboard.get_white_rooks() } else { chessboard.get_black_rooks() };
+// same logic as bishop but for straight lines
+pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
+    let rook_mask = if let Some(q_mask) = queen_mask {
+        queen_mask.unwrap()
+    } else if color == 1 {
+        chessboard.get_white_rooks()
+    } else {
+        chessboard.get_black_rooks()
+    };
+
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
     let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
     if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
@@ -169,10 +198,11 @@ pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         }
 
         move_mask &= !own_pieces;
-        for i in 0..64 {
-            if (move_mask & (1 << i)) != 0 {
-                moves.push(Move::new(x as u8, y as u8, i % 8 as u8, i / 8 as u8));
-            }
+        while move_mask != 0 {
+            let lsb = move_mask & (!move_mask + 1);
+            let target_square = lsb.trailing_zeros() as u8;
+            moves.push(Move::new(x as u8, y as u8, target_square % 8, target_square / 8));
+            move_mask &= move_mask - 1;
         }
     }
 }
@@ -183,59 +213,11 @@ pub(crate) fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Ve
     let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
     if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
 
-    for square in 0..64 {
-        if (queen_mask & (1 << square)) == 0 { continue; }
-        let x = square % 8;
-        let y = square / 8;
-        let mut move_mask:u64 = 0;
-        for i in 1..8 {
-            if x + i > 7 || y + i > 7 { break; }
-            move_mask |= 1 << (x + i + (y + i) * 8);
-            if (all_pieces & (1 << (x + i + (y + i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x - i < 0 || y - i < 0 { break; }
-            move_mask |= 1 << (x - i + (y - i) * 8);
-            if (all_pieces & (1 << (x - i + (y - i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x + i > 7 || y - i < 0 { break; }
-            move_mask |= 1 << (x + i + (y - i) * 8);
-            if (all_pieces & (1 << (x + i + (y - i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x - i < 0 || y + i > 7 { break; }
-            move_mask |= 1 << (x - i + (y + i) * 8);
-            if (all_pieces & (1 << (x - i + (y + i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x + i > 7 { break; }
-            move_mask |= 1 << (x + i + y * 8);
-            if (all_pieces & (1 << (x + i + y * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x - i < 0 { break; }
-            move_mask |= 1 << (x - i + y * 8);
-            if (all_pieces & (1 << (x - i + y * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if y + i > 7 { break; }
-            move_mask |= 1 << (x + (y + i) * 8);
-            if (all_pieces & (1 << (x + (y + i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if y - i < 0 { break; }
-            move_mask |= 1 << (x + (y - i) * 8);
-            if (all_pieces & (1 << (x + (y - i) * 8))) != 0 { break; }
-        }
+    let moves_mask:u64 = 0;
 
-        move_mask &= !own_pieces;
-        for i in 0..64 {
-            if (move_mask & (1 << i)) != 0 {
-                moves.push(Move::new(x as u8, y as u8, i % 8 as u8, i / 8 as u8));
-            }
-        }
-    }
+    // conveniently reuse bishop and rook move generation for queen moves
+    get_bishop_moves(chessboard, color, moves, Some(queen_mask));
+    get_rook_moves(chessboard, color, moves, Some(queen_mask));
 }
 
 pub(crate) fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){

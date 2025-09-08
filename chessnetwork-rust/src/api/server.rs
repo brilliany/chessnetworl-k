@@ -326,7 +326,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_bishop" => {
-            get_bishop_moves(chessboard, WHITE, &mut possible_moves);
+            get_bishop_moves(chessboard, WHITE, &mut possible_moves, None);
             for bishopmove in possible_moves.iter() {
                 if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
                     new_moves.push(*bishopmove);
@@ -334,7 +334,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_rook" => {
-            get_rook_moves(chessboard, WHITE, &mut possible_moves);
+            get_rook_moves(chessboard, WHITE, &mut possible_moves, None);
             for rookmove in possible_moves.iter() {
                 if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
                     new_moves.push(*rookmove);
@@ -374,7 +374,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_bishop" => {
-            get_bishop_moves(chessboard, BLACK, &mut possible_moves);
+            get_bishop_moves(chessboard, BLACK, &mut possible_moves, None);
             for bishopmove in possible_moves.iter() {
                 if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
                     new_moves.push(*bishopmove);
@@ -382,7 +382,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_rook" => {
-            get_rook_moves(chessboard, BLACK, &mut possible_moves);
+            get_rook_moves(chessboard, BLACK, &mut possible_moves, None);
             for rookmove in possible_moves.iter() {
                 if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
                     new_moves.push(*rookmove);
