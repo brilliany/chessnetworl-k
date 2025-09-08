@@ -196,17 +196,19 @@ function movePiece(x, y, toX, toY) {
  //moves a specific piece from one square to another in the html
     const fromSquare = document.getElementById("row" + y).children[x];
     const toSquare = document.getElementById("row" + toY).children[toX];
-    if (fromSquare.children[0].children === 0) {
+    let first = fromSquare.children[0];
+    console.log(first.children[0])
+    if (first.children[0] === undefined) {
         alert("No piece to move");
         return;
     }
-    let pieceElement = fromSquare.children[0].children[0];
+    let pieceElement = first.children[0];
     //if piece on toSquare, remove it
     if (toSquare.children[0].children.length > 0) {
         toSquare.children[0].children[0].remove();
     }
     //remove piece from fromSquare
-    fromSquare.children[0].innerHTML = "";
+    first.innerHTML = "";
     //add piece to toSquare
     toSquare.children[0].appendChild(pieceElement);
     //add event listener to piece if it's the player's color
