@@ -31,6 +31,10 @@ enum Mode {
     Search,
 }
 
+//todo maybe add this to config
+// 30 seconds time cutoff in ms for search mode
+const TIME_CUTOFF: u64 = 30000;
+
 #[derive(Clone)]
 pub(crate) struct Engine {
     mode: Mode,
@@ -72,104 +76,90 @@ impl Engine {
         let start = std::time::Instant::now();
 
         let moves = generate_moves(chessboard, self.color);
-        let chunk_size = moves.len() / num_cpus::get();
-
-        // Divide the moves into chunks for parallel processing
-        let chunks: Vec<Vec<_>> = moves.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
-
-        // Create shared references to the data structures
-        let shared_killer_moves = Arc::new(Mutex::new(self.killer_moves.lock().unwrap().clone()));
-        let shared_transposition_table = Arc::new(Mutex::new((*self.transposition_table.lock().unwrap()).clone()));
-        let shared_chessboard = Arc::new(Mutex::new(chessboard.clone()));
-        let shared_color = self.color;
-        let shared_depth = self.depth;
-        let shared_max_score = self.max_score;
-        let shared_min_score = self.min_score;
-
-        // Spawn threads to process moves in parallel
-        let handles: Vec<_> = chunks
-            .into_iter()
-            .map(|chunk| {
-                let thread_chessboard = Arc::clone(&shared_chessboard);
-                let thread_killer_moves = Arc::clone(&shared_killer_moves);
-                let thread_transposition_table = Arc::clone(&shared_transposition_table);
-
-                thread::spawn(move || {
-                    // Use shared references to the killer_moves and transposition_table
-                    let mut killer_moves = thread_killer_moves;
-                    let mut transposition_table = thread_transposition_table;
-
-                    let search = Search {
-                        depth: shared_depth,
-                        maximizing_color: shared_color,
-                        max_score: shared_max_score,
-                        min_score: shared_min_score,
-                    };
-
-                    let mut alpha = shared_min_score;
-                    let beta = shared_max_score;
-
-                    let mut best_move = None;
-                    let mut best_score = shared_min_score;
-
-                    for mv in chunk {
-                        let mut chessboard = thread_chessboard.lock().unwrap();
-                        chessboard.make_move(mv);
-
-                        let result = search.alpha_beta(
-                            shared_depth - 1,
-                            alpha,
-                            beta,
-                            shared_color,
-                            true,
-                            &mut *chessboard,
-                            true,
-                            &mut transposition_table.lock().unwrap(),
-                            &mut killer_moves.lock().unwrap(),
-                        );
-
-                        chessboard.undo_move();
-
-                        if let Some(new_best_move) = result.best_move {
-                            best_move = Some(new_best_move);
-                        }
-
-                        if result.score == shared_max_score {
-                            break;
-                        }
-
-                        best_score = result.score;
-
-                        if best_score > alpha {
-                            alpha = best_score;
-                        }
-                    }
-
-                    let end = std::time::Instant::now();
-                    println!("Thread {:?} time: {:?}", thread::current().id(), end - start);
-                    (best_move, best_score)
-                })
-            })
-            .collect();
-
-        // Collect results from threads and find the best move
-        let (mut best_move, mut best_score) = (None, self.min_score);
-
-        for handle in handles {
-            let (move_result, score_result) = handle.join().unwrap();
-
-            if score_result > best_score {
-                best_score = score_result;
-                best_move = move_result;
-            }
+        if moves.is_empty() {
+            panic!("No moves available");
         }
 
-        let best = best_move.expect("No best move found");
+        let mut best_move: Option<Move> = None;
+        let mut best_score = self.min_score;
 
-        let end = std::time::Instant::now();
-        println!("Time: {:?}", end - start);
 
-        best
+        let mut last_time = 0u64;
+        // Iterative deepening loop
+        for current_depth in 1..=self.depth {
+            // time
+            let start_time = std::time::Instant::now();
+
+            // Time per depth-unit on average increases exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
+            if current_depth > 1 {
+                let estimated_time = last_time * (current_depth as u64) * 2;
+                if estimated_time > TIME_CUTOFF {
+                    println!("Time cutoff reached, stopping search at depth {}", current_depth - 1);
+                    break;
+                }
+            }
+
+            let mut alpha = self.min_score;
+            let beta = self.max_score;
+
+            let mut depth_best_move = None;
+            let mut depth_best_score = self.min_score;
+
+            for mv in &moves {
+                let mut board_clone = chessboard.clone();
+                board_clone.make_move(*mv);
+
+                let search = Search {
+                    depth: current_depth,
+                    maximizing_color: self.color,
+                    max_score: self.max_score,
+                    min_score: self.min_score,
+                };
+
+                let result = search.alpha_beta(
+                    current_depth - 1,
+                    alpha,
+                    beta,
+                    self.color * -1, // opponent color
+                    false,          // not root
+                    &mut board_clone,
+                    true,           // allow null move / quiescence if you support it
+                    &mut self.transposition_table.lock().unwrap(),
+                    &mut self.killer_moves.lock().unwrap(),
+                );
+
+                if result.score > depth_best_score {
+                    depth_best_score = result.score;
+                    depth_best_move = Some(*mv);
+                }
+
+                // Fail-hard beta cutoff
+                if depth_best_score >= beta {
+                    break;
+                }
+
+                // Improve alpha
+                if depth_best_score > alpha {
+                    alpha = depth_best_score;
+                }
+            }
+
+            if let Some(m) = depth_best_move {
+                best_move = Some(m);
+                best_score = depth_best_score;
+            }
+
+            println!(
+                "Depth {} finished: best move {:?}, score {}, elapsed {:?}",
+                current_depth,
+                best_move,
+                best_score,
+                start.elapsed()
+            );
+            last_time = start_time.elapsed().as_millis() as u64;
+        }
+
+        best_move.expect("No best move found")
     }
 }
 

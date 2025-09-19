@@ -136,8 +136,8 @@ impl Chessboard {
     pub fn get_castling_en_passant(&self) -> u8 {
         self.castling_en_passant
     }
-    pub fn set_castling_en_passant(&mut self, castling_rights: u8) {
-        self.castling_en_passant = castling_rights;
+    pub fn set_castling_en_passant(&mut self, castling_en_passant: u8) {
+        self.castling_en_passant = castling_en_passant;
     }
     pub fn get_history(&self) -> &Vec<Chessboard> {
         &self.history

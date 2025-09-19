@@ -18,6 +18,7 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     moves.retain(|m| chessboard.get_piece_at(m.get_from_x()+ m.get_from_y() * 8) != 0);
     moves
 }
+//todo castling, en pessant, promotion
 
 pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
     let direction = -color;

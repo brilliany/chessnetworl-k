@@ -576,6 +576,7 @@ impl Session {
     }
     fn make_move(&mut self, mv: Move) {
         self.board.make_move(mv);
+        println!("move made: {}{} to {}{}", mv.get_from_x(), mv.get_from_y(), mv.get_to_x(), mv.get_to_y());
         self.turn *= -1;
     }
 }
