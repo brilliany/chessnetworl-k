@@ -21,14 +21,14 @@ use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::heuristics::Heuristics;
 
-
-const MIN_SCORE: i32 = i32::MIN + 30_000;
-const MAX_SCORE: i32 = i32::MAX - 30_000;
+//todo separate analysis and search mode, analysis takes a depth parameter, search takes a time parameter and uses iterative deepening
+//todo maybe store scoring parameters in a config?
+//todo zobrist hashing for transposition table, big speedup
 
 #[derive(Clone)]
 enum Mode {
-    Continuous,
-    Single,
+    Analysis,
+    Search,
 }
 
 #[derive(Clone)]
@@ -36,8 +36,6 @@ pub(crate) struct Engine {
     mode: Mode,
     depth: i32,
     color: i8,
-    search_tx: Arc<Mutex<Option<mpsc::Sender<Vec<Move>>>>>,
-    confidence: i32,
     max_score: i32,
     min_score: i32,
     transposition_table: Arc<Mutex<TranspositionTable>>,
@@ -45,37 +43,14 @@ pub(crate) struct Engine {
 }
 
 impl Engine {
-    pub fn new_continuous(depth: i32, color: i8, start_position: Chessboard) -> Self {
-        let transposition_table = Arc::new(Mutex::new(TranspositionTable::new()));
-        let killer_moves = Arc::new(Mutex::new(HashMap::new()));
-        let search_tx = Arc::new(Mutex::new(None));
-        let search_tx2 = search_tx.clone();
-
-        let engine = Engine {
-            mode: Mode::Continuous,
-            depth,
-            color,
-            search_tx,
-            confidence: 0,
-            max_score: i32::MAX,
-            min_score: i32::MIN,
-            transposition_table,
-            killer_moves,
-        };
-        let mut thread_engine = engine.clone();
-        thread::spawn(move || thread_engine.start_multi_search(search_tx2, start_position));
-        engine
-    }
-
+    
     pub fn new_single(depth: i32, color: i8) -> Self {
         let transposition_table = Arc::new(Mutex::new(TranspositionTable::new()));
         let killer_moves = Arc::new(Mutex::new(HashMap::new()));
         Engine {
-            mode: Mode::Single,
+            mode: Mode::Search,
             depth,
             color,
-            search_tx: Arc::new(Mutex::new(None)),
-            confidence: 0,
             max_score: i32::MAX,
             min_score: i32::MIN,
             transposition_table,
@@ -85,12 +60,10 @@ impl Engine {
 
     pub fn get_best_move(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
         match &self.mode {
-            Mode::Continuous => {
-                let (tx, rx) = mpsc::channel();
-                self.search_tx.lock().unwrap().replace(tx);
-                rx.recv().ok().and_then(|moves| moves.into_iter().next())
+            Mode::Analysis => {
+                None
             }
-            Mode::Single => Some(self.start_single_search(chessboard)),
+            Mode::Search => Some(self.start_single_search(chessboard)),
         }
     }
 
@@ -198,63 +171,6 @@ impl Engine {
 
         best
     }
-
-    fn start_multi_search(&mut self, search_tx: Arc<Mutex<Option<mpsc::Sender<Vec<Move>>>>>, mut chessboard: Chessboard) {
-        // let search = Search {
-        //     depth: self.depth,
-        //     maximizing_color: self.color,
-        //     max_score: self.max_score,
-        //     min_score: self.min_score,
-        //     transposition_table: self.transposition_table.clone(),
-        //     killer_moves: self.killer_moves.clone(),
-        // };
-        //
-        // loop {
-        //     let mut alpha = self.min_score;
-        //     let mut beta = self.max_score;
-        //
-        //     let mut best_moves = Vec::new();
-        //
-        //     let start_time = std::time::Instant::now();
-        //
-        //     // perform iterative deepening search
-        //     for current_depth in 1..=self.depth {
-        //         let result = search.alpha_beta(
-        //             current_depth,
-        //             alpha,
-        //             beta,
-        //             self.color,
-        //             true,
-        //             &mut chessboard,
-        //             true,
-        //
-        //         );
-        //
-        //         if let Some(best_move) = result.best_move {
-        //             best_moves.push(best_move);
-        //         }
-        //
-        //         //todo add change in alpha beta window here
-        //
-        //         // check if search was interrupted
-        //         if let Some(search_tx) = &*search_tx.lock().unwrap() {
-        //             if search_tx.send(best_moves.clone()).is_err() {
-        //                 return;
-        //             }
-        //         }
-        //
-        //         // check if search should be stopped early
-        //         if start_time.elapsed().as_secs() > 10 {
-        //             break;
-        //         }
-        //     }
-        //
-        //     // send best moves to listener
-        //     if let Some(search_tx) = &*search_tx.lock().unwrap() {
-        //         search_tx.send(best_moves).ok();
-        //     }
-        // }
-    }
 }
 
 pub(crate) struct Search {
@@ -291,6 +207,8 @@ fn key_to_board(key: String) -> Chessboard {
     }
     board
 }
+
+// go to the wikipedia page if you want to understand this
 impl Search {
     fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut MutexGuard<TranspositionTable>, killer_moves: &mut MutexGuard<HashMap<Move, i32>>) -> Result {
 
@@ -349,24 +267,13 @@ impl Search {
             bound_type = LowerBound;
         }
         transposition_table.insert(Entry::new(board_key.clone(), best_score, depth, best_move, bound_type));
-        // println!("Time taken to analyze moves: {} ms", start_analysis_time.elapsed().as_millis());
-        // println!("Total time taken: {} ms", start_time.elapsed().as_millis());
         Result::new(best_score, best_move)
     }
 
     pub(crate) fn evaluate(position: &Chessboard, color: i8) -> i32 {
         let mut score = 0;
-        //timer
-        let start_time = std::time::Instant::now();
         score += Self::material(position, color);
-        let material_time = start_time.elapsed().as_nanos();
-        // println!("Score after material: {}", score);
         score += Self::heuristics(position, color);
-        let heuristics_time = start_time.elapsed().as_nanos() - material_time;
-        // println!("Score after heuristics: {}", score);
-
-        // println!("Time taken to evaluate material: {} ns", material_time);
-        // println!("Time taken to evaluate heuristics: {} ns", heuristics_time);
         score
     }
 
@@ -374,15 +281,14 @@ impl Search {
         let mut score: i32 = 0;
         let heuristics = Heuristics::new(position, color);
         score += heuristics.two_middle_pawns();
-        // println!("Score after two middle pawns: {}", score);
+
         score += heuristics.castling();
-        // println!("Score after castling: {}", score);
+
         score += heuristics.knight_outpost();
-        // println!("Score after knight outpost: {}", score);
+
         score += heuristics.development();
-        // println!("Score after development: {}", score);
+
         score += heuristics.mobility();
-        // println!("Score after mobility: {}", score);
 
         score
     }

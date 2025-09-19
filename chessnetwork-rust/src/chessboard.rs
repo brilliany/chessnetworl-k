@@ -22,13 +22,31 @@ pub(crate) struct Chessboard {
     white_pieces: u64,
     black_pieces: u64,
     //castling rights stored in bit flags, 1 for right, 0 for no right
-//first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
-    castling_rights: u8,
+    //first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
+
+    //castling in 4 bits starting from top left (0, 0), just a bit flag for if castling is available for that corner
+    //en passant is the remaining 4 bits, read as a 4 bit number 0-15, indexing a square on the 2 middle ranks where en passant is possible
+    /* below numbered the squares for en passant
+      A B C D E F G H
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    1 2 3 4 5 6 7 8
+    9 10 11 12 13 14 15
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+     */
+    castling_en_passant: u8,
+    
+    //history stack for undoing moves
+    //todo implement zobrist hashing and store hashes instead of full board states
     history: Vec<Chessboard>,
 }
 
 impl Chessboard {}
 
+//todo, piece getters and setters dont need to be color specific
 impl Chessboard {
     // getters and setters for pieces and castling rights
     pub fn get_white_pawns(&self) -> u64 {
@@ -115,17 +133,17 @@ impl Chessboard {
     pub fn set_black_pieces(&mut self, black_pieces: u64) {
         self.black_pieces = black_pieces;
     }
-    pub fn get_castling_rights(&self) -> u8 {
-        self.castling_rights
+    pub fn get_castling_en_passant(&self) -> u8 {
+        self.castling_en_passant
     }
-    pub fn set_castling_rights(&mut self, castling_rights: u8) {
-        self.castling_rights = castling_rights;
+    pub fn set_castling_en_passant(&mut self, castling_rights: u8) {
+        self.castling_en_passant = castling_rights;
     }
     pub fn get_history(&self) -> &Vec<Chessboard> {
         &self.history
     }
     pub fn init(&mut self) {
-        //set white pieces
+        //set white pieces, structured like this for readability 1 << (square index)
         for i in 0..8 {
             self.set_white_pawns(self.get_white_pawns() | (1 << (48 + i)));
             self.set_black_pawns(self.get_black_pawns() | (1 << (8 + i)));
@@ -157,7 +175,7 @@ impl Chessboard {
                 | self.get_black_queens()
                 | self.get_black_kings(),
         );
-        self.set_castling_rights(0b1111);
+        self.set_castling_en_passant(1u8 );
     }
     pub fn get_piece_at(&self, pos: u8) -> i8 {
         return if (self.get_white_pawns() & (1 << pos)) != 0 {
