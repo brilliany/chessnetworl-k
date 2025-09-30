@@ -1,6 +1,7 @@
 use std::io::stdout;
 use crate::chessboard::Chessboard;
 use crate::{print_bitboard_as_chessboard, WHITE};
+use crate::pieces::Color::White;
 use crate::r#move::Move;
 
 pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
@@ -30,13 +31,13 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         let x = square % 8;
         let y = square / 8;
         //long line of ifs, just check if pawn is on last rank
-        let one_step = if y != (if color == WHITE {0} else { 7 }) { 1 << (x + (y + direction) * 8)} else { 0 };
+        let one_step = if y != (if color == White {0} else { 7 }) { 1 << (x + (y + direction) * 8)} else { 0 };
         //check sixth and seventh for white and zeroth and first for black for two_step
-        let two_step = if y != (if color == WHITE {0} else { 7 }) && y == (if color == WHITE {6} else { 1 }) { 1 << (x + (y + direction * 2) * 8)} else { 0 };
+        let two_step = if y != (if color == White {0} else { 7 }) && y == (if color == White {6} else { 1 }) { 1 << (x + (y + direction * 2) * 8)} else { 0 };
 
         let mut capture_left = 0;
         let mut capture_right = 0;
-        if y != (if color == WHITE { 0 } else { 7 }) {
+        if y != (if color == White { 0 } else { 7 }) {
              capture_left = if x != 0 { 1 << (x - 1 + (y + direction) * 8) } else { 0 };
             capture_right = if x != 7 { 1 << (x + 1 + (y + direction) * 8) } else { 0 };
         }
@@ -221,8 +222,8 @@ pub(crate) fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Ve
 }
 
 pub(crate) fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){
-    let king_mask = if color == WHITE { chessboard.get_white_kings() } else { chessboard.get_black_kings() };
-    let pieces = if color == WHITE { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
+    let king_mask = if color == White { chessboard.get_white_kings() } else { chessboard.get_black_kings() };
+    let pieces = if color == White { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
 
     for square in 0..64 {
         if (king_mask & (1u64 << square)) == 0 {

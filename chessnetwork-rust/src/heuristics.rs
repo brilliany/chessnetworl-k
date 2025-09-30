@@ -1,4 +1,5 @@
 use crate::chessboard::Chessboard;
+use crate::pieces::Color::White;
 use crate::WHITE;
 
 //pawn structure score
@@ -64,7 +65,7 @@ impl<'a> Heuristics<'a> {
     pub fn two_middle_pawns(&self) -> i32 {
         let four_center_squares: u64 = 1 << 27 | 1 << 28 | 1 << 35 | 1 << 36;
         let mut score: i32 = 0;
-        if self.color == WHITE {
+        if self.color == White {
             score += (self.white_pawns & four_center_squares).count_ones() as i32 * TWO_MIDDLE_PAWN_BONUS;
         } else {
             score += (self.black_pawns & four_center_squares).count_ones() as i32 * TWO_MIDDLE_PAWN_BONUS;
@@ -75,7 +76,7 @@ impl<'a> Heuristics<'a> {
     // castling score, give bonus if castling is still possible, give bonus * 2 if castled
     pub fn castling(&self) -> i32 {
         let mut score: i32 = 0;
-        if self.color == WHITE {
+        if self.color == White {
             let white_king_short: u64 = self.white_kings & (1 << 62);
             let white_rook_short: u64 = self.white_rooks & (1 << 61);
             let white_king_long: u64 = self.white_kings & (1 << 58);
@@ -103,7 +104,7 @@ impl<'a> Heuristics<'a> {
 
     pub fn development(&self) -> i32 {
         let mut score: i32 = 0;
-        if self.color == WHITE {
+        if self.color == White {
             score += (self.white_knights & !(1 << 57 | 1 << 62)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after knights: {}", score);
             score += (self.white_bishops & !(1 << 58 | 1 << 61)).count_ones() as i32 * DEVELOPMENT_SCORE;
@@ -133,7 +134,7 @@ impl<'a> Heuristics<'a> {
     // knight outpost score, give bonus if knight is in middle 16 squares and double if protected by pawn
     pub fn knight_outpost(&self) -> i32 {
         let mut score: i32 = 0;
-        if self.color == WHITE {
+        if self.color == White {
             let center_knights: u64 = self.white_knights & SIXTEEN_CENTER_SQUARES;
             let defended_squares: u64 = (self.white_pawns & !LEFT_BOARD_EDGE) << 7 | (self.white_pawns & !RIGHT_BOARD_EDGE) << 9;
             score += (center_knights & defended_squares).count_ones() as i32 * KNIGHT_OUTPOST_SCORE*2;

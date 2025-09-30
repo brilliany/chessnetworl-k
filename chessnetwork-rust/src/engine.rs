@@ -15,12 +15,11 @@ use std::ops::DerefMut;
 use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
 use crate::chessboard::Chessboard;
-use crate::{BLACK, EMPTY, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::heuristics::Heuristics;
-
+use crate::pieces::Color::White;
 
 const MIN_SCORE: i32 = i32::MIN + 30_000;
 const MAX_SCORE: i32 = i32::MAX - 30_000;
@@ -271,7 +270,7 @@ fn board_to_key(board: & Chessboard) -> String {
     let mut key = String::new();
     for i in 0..64 {
         let piece = board.get_piece_at(i);
-        if piece == EMPTY {
+        if piece == Empty {
             key.push_str("0");
         } else {
             key.push_str(&piece.to_string());
@@ -389,7 +388,7 @@ impl Search {
 
     fn material(position: &Chessboard, for_color: i8) -> i32 {
         let mut score = 0;
-        if for_color == WHITE {
+        if for_color == White {
             score += position.get_white_pawns().count_ones() as i32 * 10;
             score += position.get_white_knights().count_ones() as i32 * 30;
             score += position.get_white_bishops().count_ones() as i32 * 35;
