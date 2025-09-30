@@ -15,6 +15,7 @@ fn main() {
     setup();
 }
 
+
 fn setup() {
     let config = get_config();
     let result = server::main(config);
@@ -25,7 +26,7 @@ fn setup() {
     println!("Result: {}", result_string);
 }
 
-fn print_bitboard_as_chessboard(board: u64) {
+pub fn print_bitboard_as_chessboard(board: u64) {
     for y in 0..8 {
         for x in 0..8 {
             let bit = 1 << (x + y * 8);

@@ -24,19 +24,25 @@ use crate::pieces::Color::White;
 const MIN_SCORE: i32 = i32::MIN + 30_000;
 const MAX_SCORE: i32 = i32::MAX - 30_000;
 
+//todo separate analysis and search mode, analysis takes a depth parameter, search takes a time parameter and uses iterative deepening
+//todo maybe store scoring parameters in a config?
+//todo zobrist hashing for transposition table, big speedup
+
 #[derive(Clone)]
 enum Mode {
-    Continuous,
-    Single,
+    Analysis,
+    Search,
 }
+
+//todo maybe add this to config
+// 30 seconds time cutoff in ms for search mode
+const TIME_CUTOFF: u64 = 30000;
 
 #[derive(Clone)]
 pub(crate) struct Engine {
     mode: Mode,
     depth: i32,
     color: i8,
-    search_tx: Arc<Mutex<Option<mpsc::Sender<Vec<Move>>>>>,
-    confidence: i32,
     max_score: i32,
     min_score: i32,
     transposition_table: Arc<Mutex<TranspositionTable>>,
@@ -44,37 +50,14 @@ pub(crate) struct Engine {
 }
 
 impl Engine {
-    pub fn new_continuous(depth: i32, color: i8, start_position: Chessboard) -> Self {
-        let transposition_table = Arc::new(Mutex::new(TranspositionTable::new()));
-        let killer_moves = Arc::new(Mutex::new(HashMap::new()));
-        let search_tx = Arc::new(Mutex::new(None));
-        let search_tx2 = search_tx.clone();
-
-        let engine = Engine {
-            mode: Mode::Continuous,
-            depth,
-            color,
-            search_tx,
-            confidence: 0,
-            max_score: i32::MAX,
-            min_score: i32::MIN,
-            transposition_table,
-            killer_moves,
-        };
-        let mut thread_engine = engine.clone();
-        thread::spawn(move || thread_engine.start_multi_search(search_tx2, start_position));
-        engine
-    }
 
     pub fn new_single(depth: i32, color: i8) -> Self {
         let transposition_table = Arc::new(Mutex::new(TranspositionTable::new()));
         let killer_moves = Arc::new(Mutex::new(HashMap::new()));
         Engine {
-            mode: Mode::Single,
+            mode: Mode::Search,
             depth,
             color,
-            search_tx: Arc::new(Mutex::new(None)),
-            confidence: 0,
             max_score: i32::MAX,
             min_score: i32::MIN,
             transposition_table,
@@ -84,12 +67,10 @@ impl Engine {
 
     pub fn get_best_move(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
         match &self.mode {
-            Mode::Continuous => {
-                let (tx, rx) = mpsc::channel();
-                self.search_tx.lock().unwrap().replace(tx);
-                rx.recv().ok().and_then(|moves| moves.into_iter().next())
+            Mode::Analysis => {
+                None
             }
-            Mode::Single => Some(self.start_single_search(chessboard)),
+            Mode::Search => Some(self.start_single_search(chessboard)),
         }
     }
 
@@ -98,161 +79,90 @@ impl Engine {
         let start = std::time::Instant::now();
 
         let moves = generate_moves(chessboard, self.color);
-        let chunk_size = moves.len() / num_cpus::get();
-
-        // Divide the moves into chunks for parallel processing
-        let chunks: Vec<Vec<_>> = moves.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
-
-        // Create shared references to the data structures
-        let shared_killer_moves = Arc::new(Mutex::new(self.killer_moves.lock().unwrap().clone()));
-        let shared_transposition_table = Arc::new(Mutex::new((*self.transposition_table.lock().unwrap()).clone()));
-        let shared_chessboard = Arc::new(Mutex::new(chessboard.clone()));
-        let shared_color = self.color;
-        let shared_depth = self.depth;
-        let shared_max_score = self.max_score;
-        let shared_min_score = self.min_score;
-
-        // Spawn threads to process moves in parallel
-        let handles: Vec<_> = chunks
-            .into_iter()
-            .map(|chunk| {
-                let thread_chessboard = Arc::clone(&shared_chessboard);
-                let thread_killer_moves = Arc::clone(&shared_killer_moves);
-                let thread_transposition_table = Arc::clone(&shared_transposition_table);
-
-                thread::spawn(move || {
-                    // Use shared references to the killer_moves and transposition_table
-                    let mut killer_moves = thread_killer_moves;
-                    let mut transposition_table = thread_transposition_table;
-
-                    let search = Search {
-                        depth: shared_depth,
-                        maximizing_color: shared_color,
-                        max_score: shared_max_score,
-                        min_score: shared_min_score,
-                    };
-
-                    let mut alpha = shared_min_score;
-                    let beta = shared_max_score;
-
-                    let mut best_move = None;
-                    let mut best_score = shared_min_score;
-
-                    for mv in chunk {
-                        let mut chessboard = thread_chessboard.lock().unwrap();
-                        chessboard.make_move(mv);
-
-                        let result = search.alpha_beta(
-                            shared_depth - 1,
-                            alpha,
-                            beta,
-                            shared_color,
-                            true,
-                            &mut *chessboard,
-                            true,
-                            &mut transposition_table.lock().unwrap(),
-                            &mut killer_moves.lock().unwrap(),
-                        );
-
-                        chessboard.undo_move();
-
-                        if let Some(new_best_move) = result.best_move {
-                            best_move = Some(new_best_move);
-                        }
-
-                        if result.score == shared_max_score {
-                            break;
-                        }
-
-                        best_score = result.score;
-
-                        if best_score > alpha {
-                            alpha = best_score;
-                        }
-                    }
-
-                    let end = std::time::Instant::now();
-                    println!("Thread {:?} time: {:?}", thread::current().id(), end - start);
-                    (best_move, best_score)
-                })
-            })
-            .collect();
-
-        // Collect results from threads and find the best move
-        let (mut best_move, mut best_score) = (None, self.min_score);
-
-        for handle in handles {
-            let (move_result, score_result) = handle.join().unwrap();
-
-            if score_result > best_score {
-                best_score = score_result;
-                best_move = move_result;
-            }
+        if moves.is_empty() {
+            panic!("No moves available");
         }
 
-        let best = best_move.expect("No best move found");
+        let mut best_move: Option<Move> = None;
+        let mut best_score = self.min_score;
 
-        let end = std::time::Instant::now();
-        println!("Time: {:?}", end - start);
 
-        best
-    }
+        let mut last_time = 0u64;
+        // Iterative deepening loop
+        for current_depth in 1..=self.depth {
+            // time
+            let start_time = std::time::Instant::now();
 
-    fn start_multi_search(&mut self, search_tx: Arc<Mutex<Option<mpsc::Sender<Vec<Move>>>>>, mut chessboard: Chessboard) {
-        // let search = Search {
-        //     depth: self.depth,
-        //     maximizing_color: self.color,
-        //     max_score: self.max_score,
-        //     min_score: self.min_score,
-        //     transposition_table: self.transposition_table.clone(),
-        //     killer_moves: self.killer_moves.clone(),
-        // };
-        //
-        // loop {
-        //     let mut alpha = self.min_score;
-        //     let mut beta = self.max_score;
-        //
-        //     let mut best_moves = Vec::new();
-        //
-        //     let start_time = std::time::Instant::now();
-        //
-        //     // perform iterative deepening search
-        //     for current_depth in 1..=self.depth {
-        //         let result = search.alpha_beta(
-        //             current_depth,
-        //             alpha,
-        //             beta,
-        //             self.color,
-        //             true,
-        //             &mut chessboard,
-        //             true,
-        //
-        //         );
-        //
-        //         if let Some(best_move) = result.best_move {
-        //             best_moves.push(best_move);
-        //         }
-        //
-        //         //todo add change in alpha beta window here
-        //
-        //         // check if search was interrupted
-        //         if let Some(search_tx) = &*search_tx.lock().unwrap() {
-        //             if search_tx.send(best_moves.clone()).is_err() {
-        //                 return;
-        //             }
-        //         }
-        //
-        //         // check if search should be stopped early
-        //         if start_time.elapsed().as_secs() > 10 {
-        //             break;
-        //         }
-        //     }
-        //
-        //     // send best moves to listener
-        //     if let Some(search_tx) = &*search_tx.lock().unwrap() {
-        //         search_tx.send(best_moves).ok();
-        //     }
-        // }
+            // Time per depth-unit on average increases exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
+            if current_depth > 1 {
+                let estimated_time = last_time * (current_depth as u64) * 2;
+                if estimated_time > TIME_CUTOFF {
+                    println!("Time cutoff reached, stopping search at depth {}", current_depth - 1);
+                    break;
+                }
+            }
+
+            let mut alpha = self.min_score;
+            let beta = self.max_score;
+
+            let mut depth_best_move = None;
+            let mut depth_best_score = self.min_score;
+
+            for mv in &moves {
+                let mut board_clone = chessboard.clone();
+                board_clone.make_move(*mv);
+
+                let search = Search {
+                    depth: current_depth,
+                    maximizing_color: self.color,
+                    max_score: self.max_score,
+                    min_score: self.min_score,
+                };
+
+                let result = search.alpha_beta(
+                    current_depth - 1,
+                    alpha,
+                    beta,
+                    self.color * -1, // opponent color
+                    false,          // not root
+                    &mut board_clone,
+                    true,           // allow null move / quiescence if you support it
+                    &mut self.transposition_table.lock().unwrap(),
+                    &mut self.killer_moves.lock().unwrap(),
+                );
+
+                if result.score > depth_best_score {
+                    depth_best_score = result.score;
+                    depth_best_move = Some(*mv);
+                }
+
+                // Fail-hard beta cutoff
+                if depth_best_score >= beta {
+                    break;
+                }
+
+                // Improve alpha
+                if depth_best_score > alpha {
+                    alpha = depth_best_score;
+                }
+            }
+
+            if let Some(m) = depth_best_move {
+                best_move = Some(m);
+                best_score = depth_best_score;
+            }
+
+            println!(
+                "Depth {} finished: best move {:?}, score {}, elapsed {:?}",
+                current_depth,
+                best_move,
+                best_score,
+                start.elapsed()
+            );
+            last_time = start_time.elapsed().as_millis() as u64;
+        }
+
+        best_move.expect("No best move found")
     }
 }
 
@@ -290,6 +200,8 @@ fn key_to_board(key: String) -> Chessboard {
     }
     board
 }
+
+// go to the wikipedia page if you want to understand this
 impl Search {
     fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut MutexGuard<TranspositionTable>, killer_moves: &mut MutexGuard<HashMap<Move, i32>>) -> Result {
 
@@ -348,24 +260,13 @@ impl Search {
             bound_type = LowerBound;
         }
         transposition_table.insert(Entry::new(board_key.clone(), best_score, depth, best_move, bound_type));
-        // println!("Time taken to analyze moves: {} ms", start_analysis_time.elapsed().as_millis());
-        // println!("Total time taken: {} ms", start_time.elapsed().as_millis());
         Result::new(best_score, best_move)
     }
 
     pub(crate) fn evaluate(position: &Chessboard, color: i8) -> i32 {
         let mut score = 0;
-        //timer
-        let start_time = std::time::Instant::now();
         score += Self::material(position, color);
-        let material_time = start_time.elapsed().as_nanos();
-        // println!("Score after material: {}", score);
         score += Self::heuristics(position, color);
-        let heuristics_time = start_time.elapsed().as_nanos() - material_time;
-        // println!("Score after heuristics: {}", score);
-
-        // println!("Time taken to evaluate material: {} ns", material_time);
-        // println!("Time taken to evaluate heuristics: {} ns", heuristics_time);
         score
     }
 
@@ -373,15 +274,14 @@ impl Search {
         let mut score: i32 = 0;
         let heuristics = Heuristics::new(position, color);
         score += heuristics.two_middle_pawns();
-        // println!("Score after two middle pawns: {}", score);
+
         score += heuristics.castling();
-        // println!("Score after castling: {}", score);
+
         score += heuristics.knight_outpost();
-        // println!("Score after knight outpost: {}", score);
+
         score += heuristics.development();
-        // println!("Score after development: {}", score);
+
         score += heuristics.mobility();
-        // println!("Score after mobility: {}", score);
 
         score
     }

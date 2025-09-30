@@ -488,10 +488,10 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
 async fn make_engine_move(req: HttpRequest) -> impl Responder {
     let session = check_session(&req);
     let mut board = session.get_board_state();
+    println!("Engine making move for session: {}", session.get_id());
+    board.print_board();
     //for now just make a new_single engine and ask for a move
-    //freeze for 5 seconds for debugging
-    thread::sleep(time::Duration::from_secs(5));
-    let mut engine = Engine::new_single(6, Black);
+    let mut engine = Engine::new_single(6, BLACK);
     let engine_move = engine.get_best_move(&mut board).unwrap();
     println!("Engine move: {}, {}, {}, {}", engine_move.get_from_x(), engine_move.get_from_y(), engine_move.get_to_x(), engine_move.get_to_y());
     session.make_move(engine_move);
@@ -578,6 +578,7 @@ impl Session {
     }
     fn make_move(&mut self, mv: Move) {
         self.board.make_move(mv);
+        println!("move made: {}{} to {}{}", mv.get_from_x(), mv.get_from_y(), mv.get_to_x(), mv.get_to_y());
         self.turn *= -1;
     }
 }

@@ -19,12 +19,23 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     moves.retain(|m| chessboard.get_piece_at(m.get_from_x()+ m.get_from_y() * 8) != 0);
     moves
 }
+//todo castling, en pessant, promotion
 
 pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
     let direction = -color;
-    let pawn_mask = if color == 1 { chessboard.get_white_pawns() } else { chessboard.get_black_pawns() };
-    let pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
-    let opponent_pieces = if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
+    let pawn_mask;
+    let pieces;
+    let opponent_pieces;
+    // todo add an 'en pessant mask' and use that instead of checking the last move
+    if color == 1 { 
+        pawn_mask = chessboard.get_white_pawns();
+        pieces = chessboard.get_white_pieces();
+        opponent_pieces = chessboard.get_black_pieces();
+    } else { 
+        pawn_mask = chessboard.get_black_pawns();
+        pieces = chessboard.get_black_pieces();
+        opponent_pieces = chessboard.get_white_pieces();
+    };
 
     for square in 0..64 {
         if (pawn_mask & (1 << square)) == 0 { continue; }
@@ -56,7 +67,7 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
             moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
         }
 
-        if let Some(last_move) = chessboard.get_history().last() {
+        /*if let Some(last_move) = chessboard.get_history().last() {
             let black_pieces_prev = last_move.get_black_pieces();
             if y == if color == 1 { 4 } else { 3 } && (black_pieces_prev & two_step) != 0 {
                 if x != 0 && (opponent_pieces & (1 << (x - 1 + (y + direction) * 8))) != 0 {
@@ -66,7 +77,7 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
                     moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
                 }
             }
-        }
+        }*/
     }
 }
 
@@ -210,11 +221,7 @@ pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
 
 pub(crate) fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
     let queen_mask = if color == 1 { chessboard.get_white_queens() } else { chessboard.get_black_queens() };
-    let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
-    let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
     if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
-
-    let moves_mask:u64 = 0;
 
     // conveniently reuse bishop and rook move generation for queen moves
     get_bishop_moves(chessboard, color, moves, Some(queen_mask));
