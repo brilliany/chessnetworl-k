@@ -1,27 +1,21 @@
 use std::sync::mpsc::channel;
 use crate::pieces::*;
+use crate::pieces::Color::*;
+use crate::pieces::PieceType::*;
 use crate::r#move::Move;
 
 #[derive(Default)]
 #[derive(Clone)]
-
-//todo possibly store piece masks in an array instead of individual variables with enum values corresponding to array indices
 pub(crate) struct Chessboard {
     //pieces stored in bitboards
-    white_pawns: u64,
-    black_pawns: u64,
-    white_knights: u64,
-    black_knights: u64,
-    white_bishops: u64,
-    black_bishops: u64,
-    white_rooks: u64,
-    black_rooks: u64,
-    white_queens: u64,
-    black_queens: u64,
-    white_kings: u64,
-    black_kings: u64,
-    white_pieces: u64,
-    black_pieces: u64,
+    pieces: [u64; 12], //array of bitboards for each piece type, index 0-5 for white pieces, 6-11 for black pieces
+    //order: pawn, knight, bishop, rook, queen, king
+
+    white_pieces: u64, //bitboard for all white pieces
+
+    black_pieces: u64, //bitboard for all black pieces
+
+
     //castling rights stored in bit flags, 1 for right, 0 for no right
     //first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
 
@@ -47,11 +41,15 @@ pub(crate) struct Chessboard {
 
 impl Chessboard {}
 
-//todo, piece getters and setters dont need to be color specific
+
 impl Chessboard {
     // getters and setters for pieces and castling rights
-    pub fn get_piece_mask(piece: Piece) -> u64 {
-        //todo implement and use this function instead of individual getters and setters everywhere
+    pub fn get_piece_mask(&self, piece: Piece) -> u64 {
+        self.pieces[piece.get_piece_type() as usize + if piece.get_color() as usize == White as usize {0} else {6}]
+    }
+
+    pub fn set_piece_mask(&mut self, piece: Piece, mask: u64) {
+        self.pieces[piece.get_piece_type() as usize + if piece.get_color() as usize == White as usize {0} else {6}] = mask;
     }
 
     pub fn get_white_pieces(&self) -> u64 {
@@ -75,43 +73,59 @@ impl Chessboard {
     pub fn get_history(&self) -> &Vec<Chessboard> {
         &self.history
     }
-    pub fn init(&mut self) {
-        //set white pieces, structured like this for readability 1 << (square index)
-        for i in 0..8 {
-            self.set_white_pawns(self.get_white_pawns() | (1 << (48 + i)));
-            self.set_black_pawns(self.get_black_pawns() | (1 << (8 + i)));
-        }
-        self.set_white_knights(self.get_white_knights() | (1 << 57) | (1 << 62));
-        self.set_black_knights(self.get_black_knights() | (1 << 1) | (1 << 6));
-        self.set_white_bishops(self.get_white_bishops() | (1 << 58) | (1 << 61));
-        self.set_black_bishops(self.get_black_bishops() | (1 << 2) | (1 << 5));
-        self.set_white_rooks(self.get_white_rooks() | (1 << 56) | (1 << 63));
-        self.set_black_rooks(self.get_black_rooks() | (1 << 0) | (1 << 7));
-        self.set_white_queens(self.get_white_queens() | (1 << 59));
-        self.set_black_queens(self.get_black_queens() | (1 << 3));
-        self.set_white_kings(self.get_white_kings() | (1 << 60));
-        self.set_black_kings(self.get_black_kings() | (1 << 4));
 
-        self.set_white_pieces(
-            self.get_white_pawns()
-                | self.get_white_knights()
-                | self.get_white_bishops()
-                | self.get_white_rooks()
-                | self.get_white_queens()
-                | self.get_white_kings(),
-        );
-        self.set_black_pieces(
-            self.get_black_pawns()
-                | self.get_black_knights()
-                | self.get_black_bishops()
-                | self.get_black_rooks()
-                | self.get_black_queens()
-                | self.get_black_kings(),
-        );
-        self.set_castling_en_passant(1u8 );
+    pub fn init(&mut self) {
+        //todo possibly add support for more complex starting positions later, maybe loaded from a file
+        //clear all bitboards
+        self.pieces = [0; 12];
+        self.white_pieces = 0;
+        self.black_pieces = 0;
+        self.castling_en_passant = 0;
+        self.history = Vec::new();
+
+        //set white pieces, structured like this for readability 1 << (square index)
+
+        self.set_piece_mask(Piece::new(Pawn, White), 0x000000000000FF00);
+        self.set_piece_mask(Piece::new(PieceType::Pawn, Black), 0x00FF000000000000);
+
+        self.set_piece_mask(Piece::new(PieceType::Knight, White),(1 << 57) | (1 << 62));
+        self.set_piece_mask(Piece::new(PieceType::Knight, Black),(1 << 1) | (1 << 6));
+
+        self.set_piece_mask(Piece::new(PieceType::Bishop, White),(1 << 58) | (1 << 61));
+        self.set_piece_mask(Piece::new(PieceType::Bishop, Black),(1 << 2) | (1 << 5));
+
+        self.set_piece_mask(Piece::new(PieceType::Rook, White),(1 << 56) | (1 << 63));
+        self.set_piece_mask(Piece::new(PieceType::Rook, Black),(1 << 0) | (1 << 7));
+
+        self.set_piece_mask(Piece::new(PieceType::Queen, White),(1 << 59));
+        self.set_piece_mask(Piece::new(PieceType::Queen, Black),(1 << 3));
+
+        self.set_piece_mask(Piece::new(PieceType::King, White),(1 << 60));
+        self.set_piece_mask(Piece::new(PieceType::King, Black),(1 << 4));
+
+        self.set_castling_en_passant(0b1111_0000); //all castling rights available, no en passant
     }
-    pub fn get_piece_at(&self, pos: u8) -> i8 {
-        return if (self.get_white_pawns() & (1 << pos)) != 0 {
+
+    pub fn get_piece_at(&self, pos: u8) -> Piece {
+        //todo
+
+        for i in 0..12 {
+            if (self.pieces[i] & (1 << pos)) != 0 {
+                let piece_type:PieceType;
+                let color;
+                if i < 6 {
+                    color = White;
+                    piece_type = i as PieceType;
+                } else {
+                    color = Black;
+                    piece_type = i - 6
+                };
+                return Piece::new(piece_type, color)
+                }
+            }
+        }
+        Empty
+        /*return if (self.get_white_pawns() & (1 << pos)) != 0 {
             White * Pawn
         } else if (self.get_black_pawns() & (1 << pos)) != 0 {
             Black * Pawn
@@ -137,8 +151,9 @@ impl Chessboard {
             Black * King
         } else {
             0
-        }
+        }*/
     }
+
     pub(crate) fn print_board(&self) {
         println!("  A B C D E F G H");
         println!("  - - - - - - - -");
