@@ -1,91 +1,25 @@
-// convert enum to string
-macro_rules! enum_str {
-    (
-        #[derive($($derive:ident),*)]   // Capture derive attributes
-        $vis:vis enum $name:ident {
-            $($variant:ident = $val:expr),*,
-        }
-    ) => {
-        // Apply visibility and derive attributes to the enum
-        #[derive($($derive),*)]
-        $vis enum $name {
-            $($variant = $val),*
-        }
+use chessnetwork_derives::{EnumName, FromI32};
 
-        impl $name {
-            fn name(&self) -> &'static str {
-                match self {
-                    $($name::$variant => stringify!($variant)),*
-                }
-            }
-        }
-    };
-
-    // Case for when no derive attributes are provided
-    (
-        $vis:vis enum $name:ident {
-            $($variant:ident = $val:expr),*,
-        }
-    ) => {
-        // Apply visibility to the enum
-        $vis enum $name {
-            $($variant = $val),*
-        }
-
-        impl $name {
-            fn name(&self) -> &'static str {
-                match self {
-                    $($name::$variant => stringify!($variant)),*
-                }
-            }
-        }
-    };
-}
-
-// Convert enum back from i32
-macro_rules! back_to_enum {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident {
-        $($(#[$vmeta:meta])* $vname:ident $(= $val:expr)?,)*
-    }) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $($(#[$vmeta])* $vname $(= $val)?,)*
-        }
-
-        impl std::convert::TryFrom<i32> for $name {
-            type Error = ();
-
-            fn try_from(v: i32) -> Result<Self, Self::Error> {
-                match v {
-                    $(x if x == $name::$vname as i32 => Ok($name::$vname),)*
-                    _ => Err(()),
-                }
-            }
-        }
-    }
+#[derive(Copy, Clone, EnumName, FromI32, Debug)]
+#[derive(PartialEq)]
+pub enum PieceType {
+    Pawn = 1,
+    Knight = 2,
+    Bishop = 3,
+    Rook = 4,
+    Queen = 5,
+    King = 6,
+    Empty = 0,
 }
 
 
-enum_str! {
-    #[derive(Copy, Clone)]
-    pub enum PieceType {
-        Pawn = 1,
-        Knight = 2,
-        Bishop = 3,
-        Rook = 4,
-        Queen = 5,
-        King = 6,
-        Empty = 0,
-    }
-}
-
-enum_str! {
-    #[derive(Copy, Clone)]
-    pub enum Color {
+#[derive(Copy, Clone, EnumName, FromI32)]
+pub enum Color {
     White = 1,
     Black = -1,
-    }
+    None = 0,
 }
+
 
 
 pub struct Piece {

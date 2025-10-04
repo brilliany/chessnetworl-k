@@ -4,6 +4,22 @@ use crate::pieces::Color::*;
 use crate::pieces::PieceType::*;
 use crate::r#move::Move;
 
+//starting position bitboards for each piece type
+const STARTING_POS : &[(PieceType, Color, u64)] = &[
+    (Pawn,   White, 0x000000000000FF00),
+    (Pawn,   Black, 0x00FF000000000000),
+    (Knight, White, (1u64 << 57) | (1u64 << 62)),
+    (Knight, Black, (1u64 << 1)  | (1u64 << 6)),
+    (Bishop, White, (1u64 << 58) | (1u64 << 61)),
+    (Bishop, Black, (1u64 << 2)  | (1u64 << 5)),
+    (Rook,   White, (1u64 << 56) | (1u64 << 63)),
+    (Rook,   Black, (1u64 << 0)  | (1u64 << 7)),
+    (Queen,  White, (1u64 << 59)),
+    (Queen,  Black, (1u64 << 3)),
+    (King,   White, (1u64 << 60)),
+    (King,   Black, (1u64 << 4)),
+];
+
 #[derive(Default)]
 #[derive(Clone)]
 pub(crate) struct Chessboard {
@@ -83,75 +99,31 @@ impl Chessboard {
         self.castling_en_passant = 0;
         self.history = Vec::new();
 
-        //set white pieces, structured like this for readability 1 << (square index)
-
-        self.set_piece_mask(Piece::new(Pawn, White), 0x000000000000FF00);
-        self.set_piece_mask(Piece::new(PieceType::Pawn, Black), 0x00FF000000000000);
-
-        self.set_piece_mask(Piece::new(PieceType::Knight, White),(1 << 57) | (1 << 62));
-        self.set_piece_mask(Piece::new(PieceType::Knight, Black),(1 << 1) | (1 << 6));
-
-        self.set_piece_mask(Piece::new(PieceType::Bishop, White),(1 << 58) | (1 << 61));
-        self.set_piece_mask(Piece::new(PieceType::Bishop, Black),(1 << 2) | (1 << 5));
-
-        self.set_piece_mask(Piece::new(PieceType::Rook, White),(1 << 56) | (1 << 63));
-        self.set_piece_mask(Piece::new(PieceType::Rook, Black),(1 << 0) | (1 << 7));
-
-        self.set_piece_mask(Piece::new(PieceType::Queen, White),(1 << 59));
-        self.set_piece_mask(Piece::new(PieceType::Queen, Black),(1 << 3));
-
-        self.set_piece_mask(Piece::new(PieceType::King, White),(1 << 60));
-        self.set_piece_mask(Piece::new(PieceType::King, Black),(1 << 4));
-
+        // Apply placements
+        for &(ptype, color, mask) in STARTING_POS {
+            self.set_piece_mask(Piece::new(ptype, color), mask);
+        }
         self.set_castling_en_passant(0b1111_0000); //all castling rights available, no en passant
     }
 
     pub fn get_piece_at(&self, pos: u8) -> Piece {
-        //todo
-
         for i in 0..12 {
             if (self.pieces[i] & (1 << pos)) != 0 {
-                let piece_type:PieceType;
+                let piece_type: PieceType;
                 let color;
                 if i < 6 {
                     color = White;
-                    piece_type = i as PieceType;
+                    //todo not tested
+                    piece_type = PieceType::try_from(i as i32).unwrap();
                 } else {
                     color = Black;
-                    piece_type = i - 6
+                    piece_type = PieceType::try_from((i - 6) as i32).unwrap();
                 };
                 return Piece::new(piece_type, color)
-                }
             }
         }
-        Empty
-        /*return if (self.get_white_pawns() & (1 << pos)) != 0 {
-            White * Pawn
-        } else if (self.get_black_pawns() & (1 << pos)) != 0 {
-            Black * Pawn
-        } else if (self.get_white_knights() & (1 << pos)) != 0 {
-            White * Knight
-        } else if (self.get_black_knights() & (1 << pos)) != 0 {
-            Black * Knight
-        } else if (self.get_white_bishops() & (1 << pos)) != 0 {
-            White * Bishop
-        } else if (self.get_black_bishops() & (1 << pos)) != 0 {
-            Black * Bishop
-        } else if (self.get_white_rooks() & (1 << pos)) != 0 {
-            White * Rook
-        } else if (self.get_black_rooks() & (1 << pos)) != 0 {
-            Black * Rook
-        } else if (self.get_white_queens() & (1 << pos)) != 0 {
-            White * Queen
-        } else if (self.get_black_queens() & (1 << pos)) != 0 {
-            Black * Queen
-        } else if (self.get_white_kings() & (1 << pos)) != 0 {
-            White * King
-        } else if (self.get_black_kings() & (1 << pos)) != 0 {
-            Black * King
-        } else {
-            0
-        }*/
+        //if no piece found, return empty piece
+        Piece::new(Empty, None)
     }
 
     pub(crate) fn print_board(&self) {
@@ -161,13 +133,14 @@ impl Chessboard {
             print!("{}|", 8 - i);
             for j in 0..8 {
                 let piece = self.get_piece_at(i * 8 + j);
-                if piece == 0 {
+                let piece_type = piece.get_piece_type();
+                if piece_type == Empty {
                     print!("  |");
                 } else {
-                    if piece < 0 {
-                        print!("{}|", piece);
+                    if (piece_type as usize) < 0 {
+                        print!("{:?}|", piece_type);
                     } else {
-                        print!(" {}|", piece);
+                        print!(" {:?}|", piece_type);
                     }
                 }
             }
@@ -177,22 +150,27 @@ impl Chessboard {
 
     // Make a move and add the current state of the board to the history stack
     pub fn make_move(&mut self, mv: Move) {
+        //todo
+
         // Add the current board state to the history stack
         self.history.push(self.clone());
 
         // Update the board state
-        let from_x = mv.get_from_x();
+        /*let from_x = mv.get_from_x();
         let from_y = mv.get_from_y();
         let to_x = mv.get_to_x();
         let to_y = mv.get_to_y();
         let piece = self.get_piece_at(from_x + from_y * 8);
-        if piece == 0 {
+        let piece_type = piece.get_piece_type();
+        let color = piece.get_color();
+        if piece_type == Empty {
             self.print_board();
             panic!("No piece at {} {}", from_x, from_y)
-        }
-        let color = piece / piece.abs();
+        };*/
 
-        self.move_piece(from_x as usize, from_y as usize, to_x as usize, to_y as usize, piece.abs(), color);
+        let from_x = mv
+
+        self.move_piece(from_x as usize, from_y as usize, to_x as usize, to_y as usize, piece_type, color);
     }
 
     /**
@@ -205,7 +183,7 @@ impl Chessboard {
      * @param color The color of the piece to move
      */
     fn move_piece(&mut self, from_x: usize, from_y: usize, to_x: usize, to_y: usize, piece: i8, color: i8) {
-        let shift = (from_x + from_y * 8) % 64;
+        /*let shift = (from_x + from_y * 8) % 64;
         let mask = 1u64 << shift;
         match (color, piece) {
             (White, Pawn) => {
@@ -262,7 +240,10 @@ impl Chessboard {
         }
         //update white and black piece bitboards
         self.set_white_pieces(self.get_white_pawns() | self.get_white_knights() | self.get_white_bishops() | self.get_white_rooks() | self.get_white_queens() | self.get_white_kings());
-        self.set_black_pieces(self.get_black_pawns() | self.get_black_knights() | self.get_black_bishops() | self.get_black_rooks() | self.get_black_queens() | self.get_black_kings());
+        self.set_black_pieces(self.get_black_pawns() | self.get_black_knights() | self.get_black_bishops() | self.get_black_rooks() | self.get_black_queens() | self.get_black_kings());*/
+
+        //remove any piece that might be on the destination square
+
     }
 
     // Undo the last move by setting the current board state to the previous state
@@ -345,7 +326,7 @@ impl Chessboard {
             json.push_str("\t\t[");
             for x in 0..8 {
                 let mut piece = self.get_piece_at(x+y*8);
-                if piece == Empty {
+                if piece == None {
                     json.push_str("\"empty\"");
                 } else {
                     if piece < 0 {

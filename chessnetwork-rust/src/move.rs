@@ -7,6 +7,10 @@ use serde::{Serialize, Deserialize};
 pub(crate) struct Move {
     bits: u16,
 }
+/*
+todo the memory 'density' isnt that important since we never store that many moves in memory at once
+todo just store the moves as bit masks for the board to make move generation faster 
+*/
 /**
     * first 4 bits: from square x
     * second 4 bits: from square y
