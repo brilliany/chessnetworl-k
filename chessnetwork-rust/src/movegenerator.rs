@@ -16,7 +16,8 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     get_king_moves(&chessboard, color, &mut moves);
 
     //remove moves that have no piece on from square
-    moves.retain(|m| chessboard.get_piece_at(m.get_from_x()+ m.get_from_y() * 8) != 0);
+    /*moves.retain(|m| chessboard.get_piece_at(m.get_from_x()+ m.get_from_y() * 8) != 0);*/
+    
     moves
 }
 //todo castling, en pessant, promotion

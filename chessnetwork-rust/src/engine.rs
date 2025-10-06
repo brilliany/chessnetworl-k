@@ -15,6 +15,7 @@ use std::ops::DerefMut;
 use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
 use crate::chessboard::Chessboard;
+use crate::EMPTY;
 use crate::engine::BoundType::{LowerBound, UpperBound};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
@@ -173,17 +174,16 @@ pub(crate) struct Search {
     min_score: i32,
 }
 
-/** Board to key function
-       * creates a string that represents the board and can be undone to get the board back
- */
+
+//todo this will be removed when zobrist hashing is implemented
 fn board_to_key(board: & Chessboard) -> String {
     let mut key = String::new();
     for i in 0..64 {
-        let piece = board.get_piece_at(i);
-        if piece == Empty {
+        let piece = board.get_piece_at(1u64 << i);
+        if piece.0 == EMPTY {
             key.push_str("0");
         } else {
-            key.push_str(&piece.to_string());
+            key.push_str(&piece.0.to_string());
         }
     }
     key
@@ -192,11 +192,13 @@ fn board_to_key(board: & Chessboard) -> String {
        * undoes the board to key function
  */
 fn key_to_board(key: String) -> Chessboard {
-    let mut board = Chessboard::default();
-    board.init();
-    for i in 0..64 {
-        let piece = key.chars().nth(i).unwrap() as i8;
-        board.set_piece(i as u8, piece);
+    let mut board = Chessboard::new();
+    for (i, c) in key.chars().enumerate() {
+        let piece = c.to_digit(10).unwrap() as u8;
+        if piece != 0 {
+            let bit = 1u64 << i;
+            board.set_piece_at(bit, (piece, if piece % 2 == 0 { -1 } else { 1 }));
+        }
     }
     board
 }
@@ -204,7 +206,6 @@ fn key_to_board(key: String) -> Chessboard {
 // go to the wikipedia page if you want to understand this
 impl Search {
     fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut MutexGuard<TranspositionTable>, killer_moves: &mut MutexGuard<HashMap<Move, i32>>) -> Result {
-
         let board_key: String = board_to_key(chessboard);
         let mut best_move = None;
         let mut best_score = if maximizing_player { self.min_score } else { self.max_score };

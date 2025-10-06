@@ -367,15 +367,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
-name = "chessnetwork_derives"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1735,7 +1726,6 @@ name = "untitled1"
 version = "0.1.0"
 dependencies = [
  "actix-web",
- "chessnetwork_derives",
  "chrono",
  "config",
  "lazy_static",
