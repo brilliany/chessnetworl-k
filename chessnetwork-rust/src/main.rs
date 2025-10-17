@@ -8,6 +8,8 @@ mod r#move;
 mod engine;
 mod heuristics;
 #[path = "api/server.rs"] mod server;
+mod bitboards;
+define_bitboard_consts!();
 
 // Piece constants, used instead of enums for performance reasons, also easier to eg. convert a white pawn to a black pawn by multiplying by -1
 pub const PAWN: u8 = 1;

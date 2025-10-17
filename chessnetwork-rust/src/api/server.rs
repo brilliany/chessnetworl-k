@@ -9,11 +9,10 @@ use std::sync::Mutex;
 use std::{thread, time};
 
 use crate::engine::Engine;
-use crate::{get_config_value};
+use crate::{get_config_value, BLACK, WHITE};
 use crate::movegenerator::{get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
 use crate::r#move::Move;
 use crate::chessboard::Chessboard;
-use crate::pieces::Color::{Black, White};
 
 const INVALID_MOVE_VAL: u8 = 8;
 
@@ -311,7 +310,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
     let chessboard = &session.board;
     match piece.as_str() {
         "white_pawn" => {
-            get_pawn_moves(chessboard, White, &mut possible_moves);
+            get_pawn_moves(chessboard, WHITE, &mut possible_moves);
             for pawnmove in possible_moves.iter() {
                 if pawnmove.get_from_x() == x && pawnmove.get_from_y() == y {
                     println!("Adding move: {}{}{}{}", pawnmove.get_from_x(), pawnmove.get_from_y(), pawnmove.get_to_x(), pawnmove.get_to_y());
@@ -320,7 +319,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_knight" => {
-            get_knight_moves(chessboard, White, &mut possible_moves);
+            get_knight_moves(chessboard, WHITE, &mut possible_moves);
             for knightmove in possible_moves.iter() {
                 if knightmove.get_from_x() == x && knightmove.get_from_y() == y {
                     new_moves.push(*knightmove);
@@ -328,7 +327,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_bishop" => {
-            get_bishop_moves(chessboard, White, &mut possible_moves, None);
+            get_bishop_moves(chessboard, WHITE, &mut possible_moves, None);
             for bishopmove in possible_moves.iter() {
                 if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
                     new_moves.push(*bishopmove);
@@ -336,7 +335,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_rook" => {
-            get_rook_moves(chessboard, White, &mut possible_moves, None);
+            get_rook_moves(chessboard, WHITE, &mut possible_moves, None);
             for rookmove in possible_moves.iter() {
                 if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
                     new_moves.push(*rookmove);
@@ -344,7 +343,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_queen" => {
-            get_queen_moves(chessboard, White, &mut possible_moves);
+            get_queen_moves(chessboard, WHITE, &mut possible_moves);
             for queenmove in possible_moves.iter() {
                 if queenmove.get_from_x() == x && queenmove.get_from_y() == y {
                     new_moves.push(*queenmove);
@@ -352,7 +351,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "white_king" => {
-            get_king_moves(chessboard, White, &mut possible_moves);
+            get_king_moves(chessboard, WHITE, &mut possible_moves);
             for kingmove in possible_moves.iter() {
                 if kingmove.get_from_x() == x && kingmove.get_from_y() == y {
                     new_moves.push(*kingmove);
@@ -360,7 +359,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_pawn" => {
-            get_pawn_moves(chessboard, Black, &mut possible_moves);
+            get_pawn_moves(chessboard, BLACK, &mut possible_moves);
             for pawnmove in possible_moves.iter() {
                 if pawnmove.get_from_x() == x && pawnmove.get_from_y() == y {
                     new_moves.push(*pawnmove);
@@ -368,7 +367,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_knight" => {
-            get_knight_moves(chessboard, Black, &mut possible_moves);
+            get_knight_moves(chessboard, BLACK, &mut possible_moves);
             for knightmove in possible_moves.iter() {
                 if knightmove.get_from_x() == x && knightmove.get_from_y() == y {
                     new_moves.push(*knightmove);
@@ -376,7 +375,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_bishop" => {
-            get_bishop_moves(chessboard, Black, &mut possible_moves, None);
+            get_bishop_moves(chessboard, BLACK, &mut possible_moves, None);
             for bishopmove in possible_moves.iter() {
                 if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
                     new_moves.push(*bishopmove);
@@ -384,7 +383,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_rook" => {
-            get_rook_moves(chessboard, Black, &mut possible_moves, None);
+            get_rook_moves(chessboard, BLACK, &mut possible_moves, None);
             for rookmove in possible_moves.iter() {
                 if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
                     new_moves.push(*rookmove);
@@ -392,7 +391,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_queen" => {
-            get_queen_moves(chessboard, Black, &mut possible_moves);
+            get_queen_moves(chessboard, BLACK, &mut possible_moves);
             for queenmove in possible_moves.iter() {
                 if queenmove.get_from_x() == x && queenmove.get_from_y() == y {
                     new_moves.push(*queenmove);
@@ -400,7 +399,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
         "black_king" => {
-            get_king_moves(chessboard, Black, &mut possible_moves);
+            get_king_moves(chessboard, BLACK, &mut possible_moves);
             for kingmove in possible_moves.iter() {
                 if kingmove.get_from_x() == x && kingmove.get_from_y() == y {
                     new_moves.push(*kingmove);
@@ -475,7 +474,7 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
         }
     }
     println!("From x: {}, From y: {}, To x: {}, To y: {}, Piece: {}", from_x, from_y, to_x, to_y, piece);
-    session.make_move(Move::new(from_x, from_y, to_x, to_y));
+    session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
 
     println!("Currently there are {} sessions", get_session_count());
     println!("Session: {} board now looks like this:", session.get_id());
@@ -503,10 +502,10 @@ async fn get_session_object(req: HttpRequest) -> impl Responder {
     let board = session.get_board_state().convert_to_json();
     let turn = session.get_turn();
     let user_color = session.get_user_color();
-    let opponent = if user_color == White {
-        Black
+    let opponent = if user_color == WHITE {
+        BLACK
     } else {
-        White
+        WHITE
     };
     let session_id = session.get_id();
 
@@ -589,7 +588,7 @@ fn create_new_session() -> String {
     let session_id = format!("{}", Utc::now().timestamp());
     let mut board = Chessboard::default();
     board.init();
-    let session = Session::new(session_id.clone(), board, 1, White, Black);
+    let session = Session::new(session_id.clone(), board, 1, WHITE, BLACK);
 
     unsafe {
         GLOBAL_SESSIONS

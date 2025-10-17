@@ -15,12 +15,11 @@ use std::ops::DerefMut;
 use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
 use crate::chessboard::Chessboard;
-use crate::EMPTY;
+use crate::{BLACK, EMPTY, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::heuristics::Heuristics;
-use crate::pieces::Color::White;
 
 const MIN_SCORE: i32 = i32::MIN + 30_000;
 const MAX_SCORE: i32 = i32::MAX - 30_000;
@@ -192,12 +191,12 @@ fn board_to_key(board: & Chessboard) -> String {
        * undoes the board to key function
  */
 fn key_to_board(key: String) -> Chessboard {
-    let mut board = Chessboard::new();
+    let mut board = Chessboard::default();
     for (i, c) in key.chars().enumerate() {
         let piece = c.to_digit(10).unwrap() as u8;
         if piece != 0 {
             let bit = 1u64 << i;
-            board.set_piece_at(bit, (piece, if piece % 2 == 0 { -1 } else { 1 }));
+            board.set_piece_mask(piece, if piece > 0 { WHITE } else { BLACK }, board.get_piece_mask(piece, if piece > 0 { WHITE } else { BLACK }) | bit);
         }
     }
     board
@@ -289,6 +288,7 @@ impl Search {
 
     fn material(position: &Chessboard, for_color: i8) -> i32 {
         let mut score = 0;
+        //todo
         if for_color == White {
             score += position.get_white_pawns().count_ones() as i32 * 10;
             score += position.get_white_knights().count_ones() as i32 * 30;

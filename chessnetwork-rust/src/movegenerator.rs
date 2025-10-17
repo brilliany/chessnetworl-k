@@ -1,8 +1,6 @@
-use std::io::stdout;
 use crate::chessboard::Chessboard;
-use crate::{print_bitboard_as_chessboard, WHITE};
-use crate::pieces::Color::White;
 use crate::r#move::Move;
+use crate::{BISHOP, BLACK, FILE_A, FILE_H, KING, PAWN, QUEEN, RANK_0, RANK_1, RANK_6, RANK_7, ROOK, WHITE};
 
 pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     let mut moves = Vec::new();
@@ -23,33 +21,64 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
 //todo castling, en pessant, promotion
 
 pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
-    let direction = -color;
-    let pawn_mask;
-    let pieces;
-    let opponent_pieces;
     // todo add an 'en pessant mask' and use that instead of checking the last move
-    if color == 1 { 
-        pawn_mask = chessboard.get_white_pawns();
-        pieces = chessboard.get_white_pieces();
-        opponent_pieces = chessboard.get_black_pieces();
+    if color == WHITE {
+        let pieces = chessboard.get_white_pieces();
+        let opponent_pieces = chessboard.get_black_pieces();
+        
+        let pawns = chessboard.get_piece_mask(PAWN, WHITE);
+        
+        //mask for moves forward
+        let move_mask =
+            //we dont care about pawns on the last ranks
+            (pawns &! RANK_0)
+            //dont generate when pieces are in front
+            &! ((pieces | opponent_pieces) << 8);
+
+        //store mask for pawns that can move two steps on rank 6 (from white perspective)
+        let two_step_pawns = move_mask & RANK_6;
+
+        //masks for capturing moves
+        let left_capture_mask = ((pawns &! FILE_H) << 7) & opponent_pieces;
+        let right_capture_mask = (pawns &! FILE_A) << 9 & opponent_pieces;
+        
+        while move_mask !=0 {
+            
+        }
     } else { 
-        pawn_mask = chessboard.get_black_pawns();
+        pawn_mask = chessboard.get_piece_mask(PAWN, BLACK);
         pieces = chessboard.get_black_pieces();
         opponent_pieces = chessboard.get_white_pieces();
+        two_step_rank = RANK_1;
+
+        //store mask for pawns that can move two steps
+        let two_step_pawns = pawn_mask & two_step_rank;
+        //remove pawns that are on the last rank
+        let pawn_mask = pawn_mask &! RANK_0 | RANK_7;
     };
+    
+    //todo optimize by using bitwise operations instead of looping through all squares
+
+    //find capturable opponent pawns
+    //start by shifting by 7 (one row forward but one square left) in the right direction, excluding pawns on the leftmost side
+   
+
+    
+    //todo
 
     for square in 0..64 {
         if (pawn_mask & (1 << square)) == 0 { continue; }
+
         let x = square % 8;
         let y = square / 8;
         //long line of ifs, just check if pawn is on last rank
-        let one_step = if y != (if color == White {0} else { 7 }) { 1 << (x + (y + direction) * 8)} else { 0 };
+        let one_step = if y != (if color == WHITE {0} else { 7 }) { 1 << (x + (y + direction) * 8)} else { 0 };
         //check sixth and seventh for white and zeroth and first for black for two_step
-        let two_step = if y != (if color == White {0} else { 7 }) && y == (if color == White {6} else { 1 }) { 1 << (x + (y + direction * 2) * 8)} else { 0 };
+        let two_step = if y != (if color == WHITE {0} else { 7 }) && y == (if color == WHITE {6} else { 1 }) { 1 << (x + (y + direction * 2) * 8)} else { 0 };
 
         let mut capture_left = 0;
         let mut capture_right = 0;
-        if y != (if color == White { 0 } else { 7 }) {
+        if y != (if color == WHITE { 0 } else { 7 }) {
              capture_left = if x != 0 { 1 << (x - 1 + (y + direction) * 8) } else { 0 };
             capture_right = if x != 7 { 1 << (x + 1 + (y + direction) * 8) } else { 0 };
         }
@@ -68,6 +97,7 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
             moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
         }
 
+        //en passant
         /*if let Some(last_move) = chessboard.get_history().last() {
             let black_pieces_prev = last_move.get_black_pieces();
             if y == if color == 1 { 4 } else { 3 } && (black_pieces_prev & two_step) != 0 {
@@ -114,9 +144,9 @@ pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut V
     let bishop_mask = if let Some(q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
-        chessboard.get_white_bishops()
+        chessboard.get_piece_mask(BISHOP, WHITE)
     } else {
-        chessboard.get_black_bishops()
+        chessboard.get_piece_mask(BISHOP, BLACK)
     };
 
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
@@ -174,9 +204,9 @@ pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
     let rook_mask = if let Some(q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
-        chessboard.get_white_rooks()
+        chessboard.get_piece_mask(ROOK, WHITE)
     } else {
-        chessboard.get_black_rooks()
+        chessboard.get_piece_mask(ROOK, BLACK)
     };
 
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
@@ -221,7 +251,7 @@ pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
 }
 
 pub(crate) fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
-    let queen_mask = if color == 1 { chessboard.get_white_queens() } else { chessboard.get_black_queens() };
+    let queen_mask = if color == 1 { chessboard.get_piece_mask(QUEEN, WHITE) } else { chessboard.get_piece_mask(QUEEN, BLACK) };
     if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
 
     // conveniently reuse bishop and rook move generation for queen moves
@@ -230,8 +260,8 @@ pub(crate) fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Ve
 }
 
 pub(crate) fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){
-    let king_mask = if color == White { chessboard.get_white_kings() } else { chessboard.get_black_kings() };
-    let pieces = if color == White { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
+    let king_mask = if color == WHITE { chessboard.get_piece_mask(KING, BLACK) } else { chessboard.get_piece_mask(KING, WHITE) };
+    let pieces = if color == WHITE { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
 
     for square in 0..64 {
         if (king_mask & (1u64 << square)) == 0 {
