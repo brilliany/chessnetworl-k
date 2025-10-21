@@ -1,10 +1,6 @@
 #[macro_export]
 macro_rules! define_bitboard_consts {
     () => {
-        // Full/empty
-        pub const BB_EMPTY: u64 = 0u64;
-        pub const BB_FULL: u64 = !0u64;
-
         // Ranks
         pub const RANK_0: u64 = 0x00000000000000FFu64;
         pub const RANK_1: u64 = RANK_0 << 8;

@@ -18,6 +18,7 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     
     moves
 }
+
 //todo castling, en pessant, promotion
 
 pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
@@ -27,9 +28,9 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         let opponent_pieces = chessboard.get_black_pieces();
         
         let pawns = chessboard.get_piece_mask(PAWN, WHITE);
-        
+
         //mask for moves forward
-        let move_mask =
+        let mut move_mask =
             //we dont care about pawns on the last ranks
             (pawns &! RANK_0)
             //dont generate when pieces are in front
@@ -39,22 +40,82 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         let two_step_pawns = move_mask & RANK_6;
 
         //masks for capturing moves
-        let left_capture_mask = ((pawns &! FILE_H) << 7) & opponent_pieces;
-        let right_capture_mask = (pawns &! FILE_A) << 9 & opponent_pieces;
+        let mut right_capture_mask = ((pawns &! FILE_H) << 7) & opponent_pieces;
+        let mut left_capture_mask = (pawns &! FILE_A) << 9 & opponent_pieces;
         
         while move_mask !=0 {
-            
+            let to_square = 1u64 << move_mask.trailing_zeros();
+            let from_square = to_square >> 8;
+            moves.push(Move::new(from_square, to_square));
+            move_mask &=! to_square;
         }
-    } else { 
-        pawn_mask = chessboard.get_piece_mask(PAWN, BLACK);
-        pieces = chessboard.get_black_pieces();
-        opponent_pieces = chessboard.get_white_pieces();
-        two_step_rank = RANK_1;
+        //two step moves
+        while two_step_pawns != 0 {
+            let from_square = 1u64 << two_step_pawns.trailing_zeros();
+            let to_square = from_square << 16;
+            moves.push(Move::new(from_square, to_square));
+            move_mask &=! from_square;
+        }
+        //capturing moves
+        while left_capture_mask != 0 {
+            let to_square = 1u64 << left_capture_mask.trailing_zeros();
+            let from_square = to_square >> 9;
+            moves.push(Move::new(from_square, to_square));
+            left_capture_mask &=! to_square;
+        }
+        while right_capture_mask != 0 {
+            let to_square = 1u64 << right_capture_mask.trailing_zeros();
+            let from_square = to_square >> 7;
+            moves.push(Move::new(from_square, to_square));
+            right_capture_mask &=! to_square;
+        }
 
-        //store mask for pawns that can move two steps
-        let two_step_pawns = pawn_mask & two_step_rank;
-        //remove pawns that are on the last rank
-        let pawn_mask = pawn_mask &! RANK_0 | RANK_7;
+    } else {
+        let pieces = chessboard.get_black_pieces();
+        let opponent_pieces = chessboard.get_white_pieces();
+
+        let pawns = chessboard.get_piece_mask(PAWN, BLACK);
+
+        //mask for moves forward
+        let mut move_mask =
+            //we dont care about pawns on the last ranks
+            (pawns &! RANK_7)
+            //dont generate when pieces are in front
+            &! ((pieces | opponent_pieces) >> 8);
+
+        //store mask for pawns that can move two steps on rank 1 (from black perspective)
+        let two_step_pawns = move_mask & RANK_1;
+
+        //masks for capturing moves
+        let mut right_capture_mask = ((pawns &! FILE_H) >> 9) & opponent_pieces;
+        let mut left_capture_mask = (pawns &! FILE_A) >> 7 & opponent_pieces;
+
+        while move_mask !=0 {
+            let to_square = 1u64 << move_mask.trailing_zeros();
+            let from_square = to_square << 8;
+            moves.push(Move::new(from_square, to_square));
+            move_mask &=! to_square;
+        }
+        //two step moves
+        while two_step_pawns != 0 {
+            let from_square = 1u64 << two_step_pawns.trailing_zeros();
+            let to_square = from_square >> 16;
+            moves.push(Move::new(from_square, to_square));
+            move_mask &=! from_square;
+        }
+        //capturing moves
+        while left_capture_mask != 0 {
+            let to_square = 1u64 << left_capture_mask.trailing_zeros();
+            let from_square = to_square << 7;
+            moves.push(Move::new(from_square, to_square));
+            left_capture_mask &=! to_square;
+        }
+        while right_capture_mask != 0 {
+            let to_square = 1u64 << right_capture_mask.trailing_zeros();
+            let from_square = to_square << 9;
+            moves.push(Move::new(from_square, to_square));
+            right_capture_mask &=! to_square;
+        }
     };
     
     //todo optimize by using bitwise operations instead of looping through all squares
@@ -64,9 +125,9 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
    
 
     
-    //todo
 
-    for square in 0..64 {
+
+ /*   for square in 0..64 {
         if (pawn_mask & (1 << square)) == 0 { continue; }
 
         let x = square % 8;
@@ -96,7 +157,7 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         if (opponent_pieces & capture_right) != 0 {
             moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
         }
-
+*/
         //en passant
         /*if let Some(last_move) = chessboard.get_history().last() {
             let black_pieces_prev = last_move.get_black_pieces();
@@ -109,7 +170,6 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
                 }
             }
         }*/
-    }
 }
 
 pub(crate) fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){

@@ -55,9 +55,6 @@ pub(crate) struct Chessboard {
     history: Vec<Chessboard>,
 }
 
-impl Chessboard {}
-
-
 impl Chessboard {
     // getters and setters for pieces and castling rights
     pub fn get_piece_mask(&self, piece: u8, color: i8) -> u64 {
