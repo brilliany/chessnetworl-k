@@ -10,7 +10,7 @@ use std::{thread, time};
 
 use crate::engine::Engine;
 use crate::{get_config_value, BLACK, WHITE};
-use crate::movegenerator::{get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
+use crate::movegenerator::{generate_moves, get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
 use crate::r#move::Move;
 use crate::chessboard::Chessboard;
 
@@ -281,8 +281,8 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
     let queries = req.query_string();
     let queries = queries.split("&");
     let mut x = INVALID_MOVE_VAL;
-    let mut y= INVALID_MOVE_VAL;
-    let mut piece: String = "".to_string();
+    let mut y = INVALID_MOVE_VAL;
+    let mut color = INVALID_MOVE_VAL as i8;
     for query in queries {
         let query = query.split("=");
         let mut query = query.into_iter();
@@ -295,8 +295,8 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             "y" => {
                 y = value.parse::<u8>().unwrap();
             }
-            "piece" => {
-                piece = value.to_string();
+            "color" => {
+                color = value.parse::<i8>().unwrap();
             }
             _ => {
                 println!("Invalid query key: {}", key);
@@ -304,113 +304,22 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
     }
-
-    let mut possible_moves: Vec<Move> = Vec::new();
-    let mut new_moves: Vec<Move> = Vec::new();
+    println!("Getting possible moves for piece at {}, {}", x, y);
     let chessboard = &session.board;
-    match piece.as_str() {
-        "white_pawn" => {
-            get_pawn_moves(chessboard, WHITE, &mut possible_moves);
-            for pawnmove in possible_moves.iter() {
-                if pawnmove.get_from_x() == x && pawnmove.get_from_y() == y {
-                    println!("Adding move: {}{}{}{}", pawnmove.get_from_x(), pawnmove.get_from_y(), pawnmove.get_to_x(), pawnmove.get_to_y());
-                    new_moves.push(*pawnmove);
-                }
-            }
-        }
-        "white_knight" => {
-            get_knight_moves(chessboard, WHITE, &mut possible_moves);
-            for knightmove in possible_moves.iter() {
-                if knightmove.get_from_x() == x && knightmove.get_from_y() == y {
-                    new_moves.push(*knightmove);
-                }
-            }
-        }
-        "white_bishop" => {
-            get_bishop_moves(chessboard, WHITE, &mut possible_moves, None);
-            for bishopmove in possible_moves.iter() {
-                if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
-                    new_moves.push(*bishopmove);
-                }
-            }
-        }
-        "white_rook" => {
-            get_rook_moves(chessboard, WHITE, &mut possible_moves, None);
-            for rookmove in possible_moves.iter() {
-                if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
-                    new_moves.push(*rookmove);
-                }
-            }
-        }
-        "white_queen" => {
-            get_queen_moves(chessboard, WHITE, &mut possible_moves);
-            for queenmove in possible_moves.iter() {
-                if queenmove.get_from_x() == x && queenmove.get_from_y() == y {
-                    new_moves.push(*queenmove);
-                }
-            }
-        }
-        "white_king" => {
-            get_king_moves(chessboard, WHITE, &mut possible_moves);
-            for kingmove in possible_moves.iter() {
-                if kingmove.get_from_x() == x && kingmove.get_from_y() == y {
-                    new_moves.push(*kingmove);
-                }
-            }
-        }
-        "black_pawn" => {
-            get_pawn_moves(chessboard, BLACK, &mut possible_moves);
-            for pawnmove in possible_moves.iter() {
-                if pawnmove.get_from_x() == x && pawnmove.get_from_y() == y {
-                    new_moves.push(*pawnmove);
-                }
-            }
-        }
-        "black_knight" => {
-            get_knight_moves(chessboard, BLACK, &mut possible_moves);
-            for knightmove in possible_moves.iter() {
-                if knightmove.get_from_x() == x && knightmove.get_from_y() == y {
-                    new_moves.push(*knightmove);
-                }
-            }
-        }
-        "black_bishop" => {
-            get_bishop_moves(chessboard, BLACK, &mut possible_moves, None);
-            for bishopmove in possible_moves.iter() {
-                if bishopmove.get_from_x() == x && bishopmove.get_from_y() == y {
-                    new_moves.push(*bishopmove);
-                }
-            }
-        }
-        "black_rook" => {
-            get_rook_moves(chessboard, BLACK, &mut possible_moves, None);
-            for rookmove in possible_moves.iter() {
-                if rookmove.get_from_x() == x && rookmove.get_from_y() == y {
-                    new_moves.push(*rookmove);
-                }
-            }
-        }
-        "black_queen" => {
-            get_queen_moves(chessboard, BLACK, &mut possible_moves);
-            for queenmove in possible_moves.iter() {
-                if queenmove.get_from_x() == x && queenmove.get_from_y() == y {
-                    new_moves.push(*queenmove);
-                }
-            }
-        }
-        "black_king" => {
-            get_king_moves(chessboard, BLACK, &mut possible_moves);
-            for kingmove in possible_moves.iter() {
-                if kingmove.get_from_x() == x && kingmove.get_from_y() == y {
-                    new_moves.push(*kingmove);
-                }
-            }
-        }
-        _ => {
-            println!("Invalid piece");
-        }
-    };
-    HttpResponse::Ok().json(new_moves)
+    let moves = generate_moves(chessboard, color);
+
+    //remove moves that don't start from (x, y)
+    let moves: Vec<Move> = moves.into_iter().filter(|mv| {
+        mv.get_from_x() == x && mv.get_from_y() == y
+    }).collect();
+
+    //the frontend wants coordinates
+    let moves_str: Vec<String> = moves.iter().map(|mv| {
+        format!("{{\"from_x\":{},\"from_y\":{},\"to_x\":{},\"to_y\":{}}}",
+                mv.get_from_x(), mv.get_from_y(), mv.get_to_x(), mv.get_to_y())
+    }).collect();
+
+    HttpResponse::Ok().json(format!("{{\"moves\": [{}]}}", moves_str.join(",")))
 }
 #[get("/other/engine-icon.png")]
 async fn engine_icon() -> impl Responder {
@@ -490,8 +399,9 @@ async fn make_engine_move(req: HttpRequest) -> impl Responder {
     println!("Engine making move for session: {}", session.get_id());
     board.print_board();
     //for now just make a new_single engine and ask for a move
-    let mut engine = Engine::new_single(6, BLACK);
-    let engine_move = engine.get_best_move(&mut board).unwrap();
+    /*let mut engine = Engine::new_single(6, BLACK);
+    let engine_move = engine.get_best_move(&mut board).unwrap();*/
+    let engine_move = Move::new(0,0);
     println!("Engine move: {}, {}, {}, {}", engine_move.get_from_x(), engine_move.get_from_y(), engine_move.get_to_x(), engine_move.get_to_y());
     session.make_move(engine_move);
     HttpResponse::Ok().json(engine_move)
@@ -509,7 +419,12 @@ async fn get_session_object(req: HttpRequest) -> impl Responder {
     };
     let session_id = session.get_id();
 
-    let session_object = String::new() + "{\"board\":" + &board + ",\"turn\":" + &turn.to_string() + ",\"opponent\":\"" + &opponent.to_string() +  "\",\"user\":\"" + &user_color.to_string() + "\",\"session_id\":\"" + &session_id + "\"}";
+    let session_object = String::new()
+        + "{\"board\":" + &board
+        + ",\"turn\":" + &turn.to_string()
+        + ",\"opponent\":\"" + &opponent.to_string()
+        +  "\",\"user\":\"" + &user_color.to_string()
+        + "\",\"session_id\":\"" + &session_id + "\"}";
     HttpResponse::Ok().json(session_object)
 }
 

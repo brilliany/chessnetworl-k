@@ -1,12 +1,24 @@
+:root {
+    --containers: #5A0834;
+    --background: #1B0112;
+    --violent-pink: #E44EC3;
+    --secondary-containers: #2a1424;
+    --white: #f0d9b5;
+    --latte: #b58863;
+    --green: #6b9141;
+    --gray: #4d4d4d;
+}
+
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    background: #1B0112;
+    background: var(--background);
 }
 
 header {
-    background-color: #5A0834;
+    background-color: var(--containers);
     color: #fff;
     padding: 10px;
 }
@@ -34,8 +46,8 @@ nav a {
 }
 
 nav a:hover {
-    background-color: #fff;
-    color: #444;
+    background-color: var(--white);
+    color: var(--gray);
 }
 
 main {
@@ -47,7 +59,6 @@ main {
     flex-direction: column;
     width: 480px;
     height: 480px;
-    border: 1px solid #444;
     margin: 10px 120px;
 }
 
@@ -55,34 +66,33 @@ main {
     display: flex;
     flex-direction: row;
 }
-.chessboard-header {
-    display: flex;
+
+.player-info {
     flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
     width: 480px;
-    height: 40px;
-    background: #5A0834;
-    margin: 10px 120px;
-}
-.chessboard-footer {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    width: 480px;
-    height: 40px;
-    background: #5A0834;
+    height: 80px;
+    background: var(--containers);
     margin: 10px 120px;
 }
 
+.player-info img {
+    width: 60px;
+    height: 60px;
+}
+
 .icon-box {
-    position: absolute;
-    left: 0;
+    float: left;
+    display: flex;
     width: 150px;
-    height: 40px;
-    background: #E44EC3;
-    margin: 10px 120px;
+    height: 60px;
+    background: var(--secondary-containers);
+    margin: 10px 10px;
+}
+
+* p {
+    margin: 5px;
+    color: var(--violent-pink);
+    text-shadow: 1px 1px 5px black;
 }
 
 .square {
@@ -91,20 +101,21 @@ main {
 }
 
 .white {
-    background-color: #f0d9b5;
+    background-color: var(--white);
 }
 
 .black {
-    background-color: #b58863;
+    background-color: var(--latte);
 }
 
 .possible-move {
-    background-color: #6b9141;
+    background-color: var(--green);
 }
 
 .small-text {
     font-size: 0.5em;
 }
+
 .icon-text {
     font-size: 0.3em;
     position: absolute;
@@ -114,24 +125,4 @@ main {
     height: 100%;
     justify-content: center;
     align-items: center;
-}
-.icon-footer {
-    font-size: 0.3em;
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
-}
-.small-icon {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
-    border: 1px solid #444;
 }

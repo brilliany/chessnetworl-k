@@ -3,11 +3,9 @@
 //session id from cookies
 const sessionId = getCookie("session_id");
 let color = 0;
-const engine_thinking_div = document.getElementById("engine-thinking");
 let savedPossibleMoves = []
 let pieces = [] // keeps track of the pieces on the board, the 'element' property might not correspond to the actual element on the board
 
-generateIcon();
 
 await initialRequest(sessionId);
 async function initialRequest(sessionId) {
@@ -90,7 +88,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     const pieceImg = pieceElement.children[0];
     pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
     pieceImg.setAttribute("alt", piece_name);
-    console.log(color)
+
     let listenerFunction = null;
     //add event listener to piece if it's the player's color
     if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
@@ -104,7 +102,6 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
-    console.log("adding listener to piece " + piece_name)
     let listenerFunction = function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
@@ -117,7 +114,7 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
         let queries = [
             ["x", x],
             ["y", y],
-            ["piece", piece_name],
+            ["color", color],
         ]
         fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
             method: "GET",
@@ -128,22 +125,11 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
 
         }).then((response) => {
             if (response.status === 200) {
-                console.log(response);
-                response.json().then((possibleMoves) => {
-                    //possibleMoves is an array of 16 bit integers,
-                    /**
-                     * first 4 bits: from square x
-                     * second 4 bits: from square y
-                     * third 4 bits: to square x
-                     * fourth 4 bits: to square y
-                     */
-                    let receivedMoves = Object.values(possibleMoves);
-                    console.log("Possible moves: " + receivedMoves.length);
+                response.json().then((data) => {
+                    let possibleMoves = JSON.parse(data).moves;
                     for (let i = 0; i < possibleMoves.length; i++) {
-                        const move = possibleMoves[i].bits;
-                        console.log("Possible move: " + move);
-                        const toX = (move >> 8) & 0b1111;
-                        const toY = (move >> 12) & 0b1111;
+                        const toX = possibleMoves[i].to_x;
+                        const toY = possibleMoves[i].to_y;
                         const toSquare = document.getElementById("row" + toY).children[toX];
                         toSquare.classList.add("possible-move");
                         let possibleMoveListener = function () {
@@ -247,7 +233,6 @@ function unfreezeBoard() {
 
 function makeEngineMove() {
     freezeBoard();
-    engine_thinking_div.style.display = "block";
     // Path: /api/make-engine-move, returns a json with the possible moves for the piece
     // ex. { "possible_moves": [x1, y1, x2, y2]
     fetch("/api/make-engine-move", {
@@ -276,7 +261,6 @@ function makeEngineMove() {
                 movePiece(fromX, fromY, toX, toY);
                 unfreezeBoard();
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);
-                engine_thinking_div.style.display = "none";
             });
         } else {
             alert("Could not make engine move");
@@ -293,17 +277,6 @@ function removePossibleMoves() {
         //remove from savedPossibleMoves
         savedPossibleMoves.splice(i, 1);
         console.log("Removed possible move index " + i);
-    }
-}
-function generateIcon() {
-    const container = document.getElementById("user-name");
-    let text = container.children[0];
-    if (text) {
-        text.textContent = "User" + sessionId;
-    } else {
-        const text = document.createElement("h1");
-        text.textContent = "User" + sessionId;
-        container.appendChild(text);
     }
 }
 
@@ -339,6 +312,7 @@ async function getSession(sessionID) {
         console.log(response)
         if (response.status === 200) {
             await response.json().then((raw) => {
+                console.log(raw)
                 data = JSON.parse(raw);
             });
         } else {

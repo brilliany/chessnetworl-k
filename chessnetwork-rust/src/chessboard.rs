@@ -7,16 +7,16 @@ use crate::r#move::Move;
 const STARTING_POS : &[(u8, i8, u64)] = &[
     (PAWN, WHITE, 0x000000000000FF00),
     (PAWN, BLACK, 0x00FF000000000000),
-    (KNIGHT, WHITE, (1u64 << 57) | (1u64 << 62)),
-    (KNIGHT, BLACK, (1u64 << 1)  | (1u64 << 6)),
-    (BISHOP, WHITE, (1u64 << 58) | (1u64 << 61)),
-    (BISHOP, BLACK, (1u64 << 2)  | (1u64 << 5)),
-    (ROOK, WHITE, (1u64 << 56) | (1u64 << 63)),
-    (ROOK, BLACK, (1u64 << 0)  | (1u64 << 7)),
-    (QUEEN, WHITE, (1u64 << 59)),
-    (QUEEN, BLACK, (1u64 << 3)),
-    (KING, WHITE, (1u64 << 60)),
-    (KING, BLACK, (1u64 << 4)),
+    (KNIGHT, BLACK, (1u64 << 57) | (1u64 << 62)),
+    (KNIGHT, WHITE, (1u64 << 1)  | (1u64 << 6)),
+    (BISHOP, BLACK, (1u64 << 58) | (1u64 << 61)),
+    (BISHOP, WHITE, (1u64 << 2)  | (1u64 << 5)),
+    (ROOK, BLACK, (1u64 << 56) | (1u64 << 63)),
+    (ROOK, WHITE, (1u64 << 0)  | (1u64 << 7)),
+    (QUEEN, BLACK, (1u64 << 59)),
+    (QUEEN, WHITE, (1u64 << 3)),
+    (KING, BLACK, (1u64 << 60)),
+    (KING, WHITE, (1u64 << 4)),
 ];
 
 
@@ -125,12 +125,11 @@ impl Chessboard {
     }
 
     pub fn get_piece_at(&self, pos: u64) -> (u8, i8) {
-        let mask = 1u64 << pos;
         for piece in 1..=6 {
-            if (self.get_piece_mask(piece, WHITE) & mask) != 0 {
+            if (self.get_piece_mask(piece, WHITE) & pos) != 0 {
                 return (piece, WHITE);
             }
-            if (self.get_piece_mask(piece, BLACK) & mask) != 0 {
+            if (self.get_piece_mask(piece, BLACK) & pos) != 0 {
                 return (piece, BLACK);
             }
         }
@@ -242,31 +241,41 @@ impl Chessboard {
         for rank in (0..8).rev() {
             json.push_str("\t\t[");
             for file in 0..8 {
-                let square = rank * 8 + file;
-                let (piece, color) = self.get_piece_at(square as u64);
-                let string = if color == WHITE { "white" } else if color == BLACK { "black" } else { "empty" };
-                let piece_value = match (piece) {
-                    PAWN => format!("\"{}_pawn\"", string),
-                    KNIGHT => format!("\"{}_knight\"", string),
-                    BISHOP => format!("\"{}_bishop\"", string),
-                    ROOK => format!("\"{}_rook\"", string),
-                    QUEEN => format!("\"{}_queen\"", string),
-                    KING => format!("\"{}_king\"", string),
-                    EMPTY => "\"empty\"".to_string(),
-                    _ => "\"invalid\"".to_string(),
+                let square = (file + rank * 8);
+                let square_mask: u64 = 1u64 << square;
+                let (piece_type, color) = self.get_piece_at(square_mask);
+                let piece_value = match (piece_type, color) {
+                    (PAWN, WHITE) => "white_pawn",
+                    (KNIGHT, WHITE) => "white_knight",
+                    (BISHOP, WHITE) => "white_bishop",
+                    (ROOK, WHITE) => "white_rook",
+                    (QUEEN, WHITE) => "white_queen",
+                    (KING, WHITE) => "white_king",
+                    (PAWN, BLACK) => "black_pawn",
+                    (KNIGHT, BLACK) => "black_knight",
+                    (BISHOP, BLACK) => "black_bishop",
+                    (ROOK, BLACK) => "black_rook",
+                    (QUEEN, BLACK) => "black_queen",
+                    (KING, BLACK) => "black_king",
+                    (EMPTY, NONE) => "empty",
+                    _ => "invalid",
                 };
-                json.push_str(&format!("{}", piece_value));
-                if file < 7 {
+                json.push_str("\"");
+                json.push_str(piece_value);
+                json.push_str("\"");
+                if file != 7 {
                     json.push_str(", ");
                 }
             }
             json.push_str("]");
-            if rank > 0 {
+            if rank != 0 {
                 json.push_str(",\n");
             } else {
                 json.push_str("\n");
             }
         }
+        json.push_str("\t]\n");
+        json.push_str("}\n");
         json
     }
 }

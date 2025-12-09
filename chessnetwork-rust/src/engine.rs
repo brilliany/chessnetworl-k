@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::ops::DerefMut;
+use crate::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 
 /**
     Engine will have two modes:
@@ -289,7 +289,7 @@ impl Search {
     fn material(position: &Chessboard, for_color: i8) -> i32 {
         let mut score = 0;
         //todo
-        if for_color == White {
+        /*if for_color == WHITE {
             score += position.get_white_pawns().count_ones() as i32 * 10;
             score += position.get_white_knights().count_ones() as i32 * 30;
             score += position.get_white_bishops().count_ones() as i32 * 35;
@@ -315,6 +315,23 @@ impl Search {
             score += position.get_black_rooks().count_ones() as i32 * 50;
             score += position.get_black_queens().count_ones() as i32 * 90;
             score += position.get_black_kings().count_ones() as i32 * 2000;
+        }*/
+        for i in 1..6 {
+            let piece_value = match i {
+                PAWN => 10,   // Pawn
+                KNIGHT => 30,   // Knight
+                BISHOP => 35,   // Bishop
+                ROOK => 50,   // Rook
+                QUEEN => 90,   // Queen
+                _ => 0,
+            };
+            if for_color == WHITE {
+                score += position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
+                score -= position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+            } else {
+                score -= position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
+                score += position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+            }
         }
         score
     }

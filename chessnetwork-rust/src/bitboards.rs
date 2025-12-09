@@ -25,5 +25,6 @@ macro_rules! define_bitboard_consts {
         pub const LIGHT_SQUARES: u64 = 0x55AA55AA55AA55AAu64;
         pub const DARK_SQUARES: u64 = !LIGHT_SQUARES;
         pub const CENTER_4: u64 = 0x0000001818000000u64; // d4,e4,d5,e5
+        
     };
 }

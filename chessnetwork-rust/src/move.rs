@@ -52,23 +52,38 @@ impl Move {
         self.to_mask
     }
 
-    // slow coordinate getters for front e.g frontend
+    // slow coordinate getters for front e.g frontend (flipped: origin at bottom-right)
     pub fn get_from_x(&self) -> u8 {
-        self.from_mask.trailing_zeros() as u8 % 8
+        let idx = self.from_mask.trailing_zeros() as u8;
+        let x = idx % 8;
+        7 - x
     }
     pub fn get_from_y(&self) -> u8 {
-        self.from_mask.trailing_zeros() as u8 / 8
+        let idx = self.from_mask.trailing_zeros() as u8;
+        let y = idx / 8;
+        7 - y
     }
     pub fn get_to_x(&self) -> u8 {
-        self.to_mask.trailing_zeros() as u8 % 8
+        let idx = self.to_mask.trailing_zeros() as u8;
+        let x = idx % 8;
+        7 - x
     }
     pub fn get_to_y(&self) -> u8 {
-        self.to_mask.trailing_zeros() as u8 / 8
+        let idx = self.to_mask.trailing_zeros() as u8;
+        let y = idx / 8;
+        7 - y
     }
 
+    // Accepts frontend (flipped) coordinates and converts them to internal bitmask indices
     pub fn new_from_coordinates(from_x: u8, from_y: u8, to_x: u8, to_y: u8) -> Move {
-        let from_mask = 1u64 << (from_x + from_y * 8);
-        let to_mask = 1u64 << (to_x + to_y * 8);
+        // convert frontend coords (flipped origin at bottom-right) to internal (origin top-left)
+        let fx = 7 - from_x;
+        let fy = 7 - from_y;
+        let tx = 7 - to_x;
+        let ty = 7 - to_y;
+
+        let from_mask = 1u64 << (fx + fy * 8);
+        let to_mask = 1u64 << (tx + ty * 8);
         Move { from_mask, to_mask }
     }
 }
