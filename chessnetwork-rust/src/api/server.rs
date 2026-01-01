@@ -7,9 +7,9 @@ use chrono::Utc;
 use cookie::Cookie;
 use std::sync::Mutex;
 use std::{thread, time};
-
+use std::any::Any;
 use crate::engine::Engine;
-use crate::{get_config_value, BLACK, WHITE};
+use crate::{get_config_value, print_bitboard_as_chessboard, BLACK, WHITE};
 use crate::movegenerator::{generate_moves, get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
 use crate::r#move::Move;
 use crate::chessboard::Chessboard;
@@ -126,15 +126,6 @@ async fn play_engine(req: HttpRequest) -> impl Responder {
 }
 
 //get js/ts files
-/*
-#[get("/js/play-engine.js")]
-async fn play_engine_js() -> impl Responder {
-    //respond with the web/js/play-engine.js file
-    let path = format!("web/js/play-engine.js");
-    let file_contents = read_file(&path);
-    HttpResponse::Ok().content_type("text/javascript").body(file_contents)
-}
-*/
 
 #[get("/js/chessboard.js")]
 async fn chessboard_js() -> impl Responder {
@@ -143,16 +134,6 @@ async fn chessboard_js() -> impl Responder {
     let file_contents = read_file(&path);
     HttpResponse::Ok().content_type("text/javascript").body(file_contents)
 }
-
-/*
-#[get("/js/web-utils.js")]
-async fn web_utils_js() -> impl Responder {
-    //respond with the web/js/chessboard.js file
-    let path = format!("web/js/web-utils.js");
-    let file_contents = read_file(&path);
-    HttpResponse::Ok().content_type("script/javascript").body(file_contents)
-}
-*/
 
 //api operations
 #[get("/api/populate-board")]
@@ -304,7 +285,6 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
     }
-    println!("Getting possible moves for piece at {}, {}", x, y);
     let chessboard = &session.board;
     let moves = generate_moves(chessboard, color);
 
@@ -399,12 +379,21 @@ async fn make_engine_move(req: HttpRequest) -> impl Responder {
     println!("Engine making move for session: {}", session.get_id());
     board.print_board();
     //for now just make a new_single engine and ask for a move
-    /*let mut engine = Engine::new_single(6, BLACK);
-    let engine_move = engine.get_best_move(&mut board).unwrap();*/
-    let engine_move = Move::new(0,0);
-    println!("Engine move: {}, {}, {}, {}", engine_move.get_from_x(), engine_move.get_from_y(), engine_move.get_to_x(), engine_move.get_to_y());
-    session.make_move(engine_move);
-    HttpResponse::Ok().json(engine_move)
+    let mut engine = Engine::new_single(6, BLACK);
+    let engine_move = engine.get_best_move(&mut board).unwrap();
+    let from_x = engine_move.get_from_x();
+    let from_y = engine_move.get_from_y();
+    let to_x = engine_move.get_to_x();
+    let to_y = engine_move.get_to_y();
+    println!("Engine move: {}, {}, {}, {}", from_x, from_y, to_x, to_y);
+    session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
+    let move_obj = String::new()
+        + "{\"from_x\":" + &from_x.to_string()
+        + ",\"from_y\":" + &from_y.to_string()
+        + ",\"to_x\":" + &to_x.to_string()
+        +  ",\"to_y\":" + &to_y.to_string()
+        +  "}";
+    HttpResponse::Ok().json(move_obj)
 }
 #[get("/api/get-session")]
 async fn get_session_object(req: HttpRequest) -> impl Responder {
@@ -492,7 +481,6 @@ impl Session {
     }
     fn make_move(&mut self, mv: Move) {
         self.board.make_move(mv);
-        println!("move made: {}{} to {}{}", mv.get_from_x(), mv.get_from_y(), mv.get_to_x(), mv.get_to_y());
         self.turn *= -1;
     }
 }

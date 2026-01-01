@@ -1,6 +1,8 @@
 use config::{FileFormat, Config, File, Source};
 use config::ValueKind::I128;
-use crate::engine::Engine;
+use crate::chessboard::Chessboard;
+use crate::engine::{board_to_key, key_to_board, Engine};
+use crate::r#move::Move;
 
 mod chessboard;
 mod movegenerator;
@@ -27,7 +29,12 @@ pub const NONE: i8 = 0;
 
 
 fn main() {
-    setup();
+    let mut board = Chessboard::default();
+    board.init();
+    let board_string = board_to_key(&board);
+    board.print_board();
+    key_to_board(board_string).print_board()
+    /*setup();*/
 }
 
 

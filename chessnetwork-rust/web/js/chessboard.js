@@ -244,20 +244,13 @@ function makeEngineMove() {
 
     }).then((response) => {
         if (response.status === 200) {
-            console.log(response);
             response.json().then((response) => {
-                //move is an unsigned 16 bit integer,
-                /**
-                 * first 4 bits: from square x
-                 * second 4 bits: from square y
-                 * third 4 bits: to square x
-                 * fourth 4 bits: to square y
-                 */
-                const move = response.bits
-                const fromX = move & 0b1111;
-                const fromY = (move >> 4) & 0b1111;
-                const toX = (move >> 8) & 0b1111;
-                const toY = (move >> 12) & 0b1111;
+                let json = JSON.parse(response);
+                console.log(json)
+                const fromX = json.from_x;
+                const fromY = json.from_y;
+                const toX = json.to_x;
+                const toY = json.to_y;
                 movePiece(fromX, fromY, toX, toY);
                 unfreezeBoard();
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);

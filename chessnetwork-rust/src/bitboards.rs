@@ -12,7 +12,7 @@ macro_rules! define_bitboard_consts {
         pub const RANK_7: u64 = RANK_0 << 56;
 
         // Files
-        pub const FILE_A: u64 = 0x0101010101010101u64;
+        pub const FILE_A: u64 = /*0x1010101010101010u64;*/ 0b00000001_00000001_00000001_00000001_00000001_00000001_00000001_00000001;
         pub const FILE_B: u64 = FILE_A << 1;
         pub const FILE_C: u64 = FILE_A << 2;
         pub const FILE_D: u64 = FILE_A << 3;
@@ -20,6 +20,7 @@ macro_rules! define_bitboard_consts {
         pub const FILE_F: u64 = FILE_A << 5;
         pub const FILE_G: u64 = FILE_A << 6;
         pub const FILE_H: u64 = FILE_A << 7;
+
 
         // Square colors and a common center mask
         pub const LIGHT_SQUARES: u64 = 0x55AA55AA55AA55AAu64;

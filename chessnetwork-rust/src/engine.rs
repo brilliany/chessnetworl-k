@@ -45,15 +45,14 @@ pub(crate) struct Engine {
     color: i8,
     max_score: i32,
     min_score: i32,
-    transposition_table: Arc<Mutex<TranspositionTable>>,
-    killer_moves: Arc<Mutex<HashMap<Move, i32>>>,
+    transposition_table: TranspositionTable,
+    killer_moves: HashMap<Move, i32>,
 }
 
 impl Engine {
-
     pub fn new_single(depth: i32, color: i8) -> Self {
-        let transposition_table = Arc::new(Mutex::new(TranspositionTable::new()));
-        let killer_moves = Arc::new(Mutex::new(HashMap::new()));
+        let transposition_table = TranspositionTable::new();
+        let killer_moves = HashMap::new();
         Engine {
             mode: Mode::Search,
             depth,
@@ -93,7 +92,7 @@ impl Engine {
             // time
             let start_time = std::time::Instant::now();
 
-            // Time per depth-unit on average increases exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
+            // Time per depth-unit on average increases almost exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
             if current_depth > 1 {
                 let estimated_time = last_time * (current_depth as u64) * 2;
                 if estimated_time > TIME_CUTOFF {
@@ -109,26 +108,21 @@ impl Engine {
             let mut depth_best_score = self.min_score;
 
             for mv in &moves {
-                let mut board_clone = chessboard.clone();
-                board_clone.make_move(*mv);
-
                 let search = Search {
-                    depth: current_depth,
-                    maximizing_color: self.color,
                     max_score: self.max_score,
                     min_score: self.min_score,
                 };
 
                 let result = search.alpha_beta(
-                    current_depth - 1,
+                    current_depth,
                     alpha,
                     beta,
-                    self.color * -1, // opponent color
-                    false,          // not root
-                    &mut board_clone,
-                    true,           // allow null move / quiescence if you support it
-                    &mut self.transposition_table.lock().unwrap(),
-                    &mut self.killer_moves.lock().unwrap(),
+                    self.color,
+                    true,
+                    chessboard,
+                    true,
+                    &mut self.transposition_table,
+                    &mut self.killer_moves,
                 );
 
                 if result.score > depth_best_score {
@@ -153,9 +147,10 @@ impl Engine {
             }
 
             println!(
-                "Depth {} finished: best move {:?}, score {}, elapsed {:?}",
+                "Depth {} finished: best move {} to {}, score {}, elapsed {:?}",
                 current_depth,
-                best_move,
+                best_move.unwrap().get_from_mask().trailing_zeros(),
+                best_move.unwrap().get_to_mask().trailing_zeros(),
                 best_score,
                 start.elapsed()
             );
@@ -167,15 +162,13 @@ impl Engine {
 }
 
 pub(crate) struct Search {
-    depth: i32,
-    maximizing_color: i8,
     max_score: i32,
     min_score: i32,
 }
 
 
 //todo this will be removed when zobrist hashing is implemented
-fn board_to_key(board: & Chessboard) -> String {
+pub fn board_to_key(board: & Chessboard) -> String {
     let mut key = String::new();
     for i in 0..64 {
         let piece = board.get_piece_at(1u64 << i);
@@ -190,7 +183,7 @@ fn board_to_key(board: & Chessboard) -> String {
 /** Key to board function
        * undoes the board to key function
  */
-fn key_to_board(key: String) -> Chessboard {
+pub fn key_to_board(key: String) -> Chessboard {
     let mut board = Chessboard::default();
     for (i, c) in key.chars().enumerate() {
         let piece = c.to_digit(10).unwrap() as u8;
@@ -204,7 +197,14 @@ fn key_to_board(key: String) -> Chessboard {
 
 // go to the wikipedia page if you want to understand this
 impl Search {
-    fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut MutexGuard<TranspositionTable>, killer_moves: &mut MutexGuard<HashMap<Move, i32>>) -> Result {
+    fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>) -> Result {
+        if depth == 0 {
+            let score = Self::evaluate(chessboard, color);
+            /*println!("Reached end of depth");
+            chessboard.print_board();*/
+            return Result::new(score, None);
+        }
+
         let board_key: String = board_to_key(chessboard);
         let mut best_move = None;
         let mut best_score = if maximizing_player { self.min_score } else { self.max_score };
@@ -214,15 +214,11 @@ impl Search {
         if use_move_ordering {
             moves.sort_by_key(|mov| {
                 if killer_moves.contains_key(mov) {
-                    -(killer_moves.get(mov).unwrap())
+                    -killer_moves.get(mov).unwrap()
                 } else {
                     0
                 }
             });
-        }
-        if depth == 0 {
-            let score = Self::evaluate(chessboard, color);
-            return Result::new(score, None);
         }
         if moves.len() == 0 {
             return Result::new(self.min_score, None);
@@ -288,34 +284,6 @@ impl Search {
 
     fn material(position: &Chessboard, for_color: i8) -> i32 {
         let mut score = 0;
-        //todo
-        /*if for_color == WHITE {
-            score += position.get_white_pawns().count_ones() as i32 * 10;
-            score += position.get_white_knights().count_ones() as i32 * 30;
-            score += position.get_white_bishops().count_ones() as i32 * 35;
-            score += position.get_white_rooks().count_ones() as i32 * 50;
-            score += position.get_white_queens().count_ones() as i32 * 90;
-            score += position.get_white_kings().count_ones() as i32 * 2000;
-            score += position.get_black_pawns().count_ones() as i32 * -10;
-            score += position.get_black_knights().count_ones() as i32 * -30;
-            score += position.get_black_bishops().count_ones() as i32 * -35;
-            score += position.get_black_rooks().count_ones() as i32 * -50;
-            score += position.get_black_queens().count_ones() as i32 * -90;
-            score += position.get_black_kings().count_ones() as i32 * -2000;
-        } else {
-            score += position.get_white_pawns().count_ones() as i32 * -10;
-            score += position.get_white_knights().count_ones() as i32 * -30;
-            score += position.get_white_bishops().count_ones() as i32 * -35;
-            score += position.get_white_rooks().count_ones() as i32 * -50;
-            score += position.get_white_queens().count_ones() as i32 * -90;
-            score += position.get_white_kings().count_ones() as i32 * -2000;
-            score += position.get_black_pawns().count_ones() as i32 * 10;
-            score += position.get_black_knights().count_ones() as i32 * 30;
-            score += position.get_black_bishops().count_ones() as i32 * 35;
-            score += position.get_black_rooks().count_ones() as i32 * 50;
-            score += position.get_black_queens().count_ones() as i32 * 90;
-            score += position.get_black_kings().count_ones() as i32 * 2000;
-        }*/
         for i in 1..6 {
             let piece_value = match i {
                 PAWN => 10,   // Pawn

@@ -1,6 +1,6 @@
 use crate::chessboard::Chessboard;
 use crate::r#move::Move;
-use crate::{print_bitboard_as_chessboard, BISHOP, BLACK, FILE_A, FILE_H, KING, KNIGHT, PAWN, QUEEN, RANK_0, RANK_1, RANK_2, RANK_6, RANK_7, ROOK, WHITE};
+use crate::{BISHOP, BLACK, FILE_A, FILE_B, FILE_G, FILE_H, KING, KNIGHT, PAWN, QUEEN, RANK_0, RANK_2, RANK_5, RANK_7, ROOK, WHITE};
 
 pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     let mut moves = Vec::new();
@@ -12,9 +12,6 @@ pub(crate) fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
     get_rook_moves(&chessboard, color, &mut moves, None);
     get_queen_moves(&chessboard, color, &mut moves);
     get_king_moves(&chessboard, color, &mut moves);
-
-    //remove moves that have no piece on from square
-    /*moves.retain(|m| chessboard.get_piece_at(m.get_from_x()+ m.get_from_y() * 8) != 0);*/
     
     moves
 }
@@ -26,49 +23,48 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
     if color == WHITE {
         let pieces = chessboard.get_white_pieces();
         let opponent_pieces = chessboard.get_black_pieces();
-        
         let pawns = chessboard.get_piece_mask(PAWN, WHITE);
 
         //mask for moves forward
         let mut move_mask =
             //we dont care about pawns on the last ranks
-            (pawns &! RANK_7)
+            (pawns &! RANK_7) << 8
             //dont generate when pieces are in front
-            &! ((pieces | opponent_pieces) >> 8);
+            &! (pieces | opponent_pieces);
+
 
         //store mask for pawns that can move two steps on rank 6 (from white perspective)
-        let two_step_pawns = pawns & RANK_1;
-        
+        let mut two_step_pawns = (move_mask & RANK_2) >> 8;
 
         //masks for capturing moves
         let mut right_capture_mask = ((pawns &! FILE_H) >> 7) & opponent_pieces;
         let mut left_capture_mask = (pawns &! FILE_A) >> 9 & opponent_pieces;
         
         while move_mask != 0 {
-            let from_square = 1u64 << move_mask.trailing_zeros();
-            let to_square = from_square << 8;
+            let to_square = 1u64 << move_mask.trailing_zeros();
+            let from_square = to_square >> 8;
             moves.push(Move::new(from_square, to_square));
-            move_mask &=! from_square;
+            move_mask &= move_mask -1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let from_square = 1u64 << two_step_pawns.trailing_zeros();
             let to_square = from_square << 16;
             moves.push(Move::new(from_square, to_square));
-            move_mask &=! from_square;
+            two_step_pawns &= two_step_pawns -1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square << 9;
             moves.push(Move::new(from_square, to_square));
-            left_capture_mask &=! to_square;
+            left_capture_mask &= left_capture_mask -1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square << 7;
             moves.push(Move::new(from_square, to_square));
-            right_capture_mask &=! to_square;
+            right_capture_mask &= right_capture_mask -1;
         }
     } else {
         let pieces = chessboard.get_black_pieces();
@@ -79,12 +75,12 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         //mask for moves forward
         let mut move_mask =
             //we dont care about pawns on the last ranks
-            (pawns &! RANK_0)
+            (pawns.clone() &! RANK_0) >> 8
             //dont generate when pieces are in front
-            &! ((pieces | opponent_pieces) >> 8);
+            &! ((pieces | opponent_pieces));
 
         //store mask for pawns that can move two steps on rank 1 (from black perspective)
-        let two_step_pawns = move_mask & RANK_1;
+        let mut two_step_pawns = (move_mask & RANK_5) << 8;
 
         //masks for capturing moves
         let mut right_capture_mask = ((pawns &! FILE_H) << 9) & opponent_pieces;
@@ -92,29 +88,29 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
 
         while move_mask !=0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
-            let from_square = to_square >> 8;
+            let from_square = to_square << 8;
             moves.push(Move::new(from_square, to_square));
-            move_mask &=! to_square;
+            move_mask &= move_mask -1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let from_square = 1u64 << two_step_pawns.trailing_zeros();
-            let to_square = from_square << 16;
+            let to_square = from_square >> 16;
             moves.push(Move::new(from_square, to_square));
-            move_mask &=! from_square;
+            two_step_pawns &= two_step_pawns -1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square >> 7;
             moves.push(Move::new(from_square, to_square));
-            left_capture_mask &=! to_square;
+            left_capture_mask &= left_capture_mask -1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square >> 9;
             moves.push(Move::new(from_square, to_square));
-            right_capture_mask &=! to_square;
+            right_capture_mask &= right_capture_mask -1;
         }
     };
     
@@ -134,41 +130,53 @@ pub(crate) fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
 }
 
 pub(crate) fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){
-    let mut knight_mask = if color == 1 { chessboard.get_piece_mask(KNIGHT, WHITE) } else { chessboard.get_piece_mask(KNIGHT, BLACK) };
+    let mut knight_mask = chessboard.get_piece_mask(KNIGHT, color);
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
 
-    // important to check if the to square will be outside the board BEFORE making any mask, otherwise it will overflow
-    for square in 0..64 {
-        if (knight_mask & (1 << square)) == 0 { continue; }
-        let x = square % 8;
-        let y = square / 8;
-        let mut move_mask:u64 = 0;
-        if x > 0 && y > 1 { move_mask |= 1 << (x - 1 + (y - 2) * 8); }
-        if x > 1 && y > 0 { move_mask |= 1 << (x - 2 + (y - 1) * 8); }
-        if x > 1 && y < 7 { move_mask |= 1 << (x - 2 + (y + 1) * 8); }
-        if x > 0 && y < 6 { move_mask |= 1 << (x - 1 + (y + 2) * 8); }
-        if x < 7 && y < 6 { move_mask |= 1 << (x + 1 + (y + 2) * 8); }
-        if x < 6 && y < 7 { move_mask |= 1 << (x + 2 + (y + 1) * 8); }
-        if x < 6 && y > 0 { move_mask |= 1 << (x + 2 + (y - 1) * 8); }
-        if x < 7 && y > 1 { move_mask |= 1 << (x + 1 + (y - 2) * 8); }
+    while knight_mask != 0 {
+        let from = 1u64 << knight_mask.trailing_zeros();
+
+        let mut move_mask = 0u64;
+
+        //from whites perspective (A1 is bit 0)
+        //moves up and right (shift 8 + 8 and 1), dont if were on the rightmost file
+        move_mask |= (from & !FILE_A)  >> 17;
+        //up and left 8 + 8 - 1 and so on
+        move_mask |= (from & !FILE_H)  >> 15;
+        move_mask |= (from & !(FILE_B | FILE_A)) >> 10;
+        move_mask |= (from & !(FILE_H | FILE_G)) >> 6;
+
+        //same thing but shift right for the moves down the board
+        move_mask |= (from & !FILE_A)  << 15;
+        move_mask |= (from & !FILE_H)  << 17;
+        move_mask |= (from & !(FILE_B | FILE_A)) << 6;
+        move_mask |= (from & !(FILE_H | FILE_G)) << 10;
+
+        // remove own pieces
         move_mask &= !own_pieces;
-        for i in 0..64 {
-            if (move_mask & (1 << i)) != 0 {
-                moves.push(Move::new(1u64 << square, 1u64 << i));
-            }
+
+        // convert attacks to move list
+        let mut targets = move_mask;
+        while targets != 0 {
+            let to = 1u64 << targets.trailing_zeros();
+            let from = 1u64 << knight_mask.trailing_zeros();
+            moves.push(Move::new(from, to));
+            targets &= targets - 1;
         }
+        knight_mask &= knight_mask - 1;
     }
 }
 
-pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
 
+
+pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
     // if queen_mask is Some, use that as the bishop mask, otherwise use the bishops from the chessboard
     let bishop_mask = if let Some(q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
-        chessboard.get_piece_mask(BISHOP, WHITE)
+        chessboard.get_piece_mask(BISHOP, WHITE).clone()
     } else {
-        chessboard.get_piece_mask(BISHOP, BLACK)
+        chessboard.get_piece_mask(BISHOP, BLACK).clone()
     };
 
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };

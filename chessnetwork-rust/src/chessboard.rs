@@ -20,7 +20,7 @@ const STARTING_POS : &[(u8, i8, u64)] = &[
 ];
 
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[derive(Clone)]
 pub(crate) struct Chessboard {
     //pieces stored in bitboards
@@ -31,23 +31,27 @@ pub(crate) struct Chessboard {
 
     black_pieces: u64, //bitboard for all black pieces
 
+    /**
 
-    //castling rights stored in bit flags, 1 for right, 0 for no right
-    //first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
+    castling rights stored in bit flags, 1 for right, 0 for no right
+    first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
 
-    //castling in 4 bits starting from top left (0, 0), just a bit flag for if castling is available for that corner
-    //en passant is the remaining 4 bits, read as a 4 bit number 0-15, indexing a square on the 2 middle ranks where en passant is possible
-    /* below numbered the squares for en passant
-      A B C D E F G H
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    1 2 3 4 5 6 7 8
-    9 10 11 12 13 14 15
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
+    castling in 4 bits starting from top left (0, 0), just a bit flag for if castling is available for that corner
+    en passant is the remaining 4 bits, read as a 4 bit number 0-15, indexing a square on the 2 middle ranks where en passant is possible
+
      */
+    /*
+    en passant squares:
+    A B C D E F G H
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    x x x x x x x x
+    x x x x x x x x
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    0 0 0 0 0 0 0 0
+    */
     castling_en_passant: u8,
     
     //history stack for undoing moves
@@ -58,19 +62,20 @@ pub(crate) struct Chessboard {
 impl Chessboard {
     // getters and setters for pieces and castling rights
     pub fn get_piece_mask(&self, piece: u8, color: i8) -> u64 {
-        self.pieces[self.piece_index(piece, color).unwrap()]
+        self.pieces[self.piece_index(piece, color).unwrap()].clone()
     }
 
-    // set the bitboard for a specific piece type and color NOTE: does not update white_pieces or black_pieces bitboards
+    /// set the bitboard for a specific piece type and color NOTE: does not update white_pieces or black_pieces bitboards
     pub fn set_piece_mask(&mut self, piece: u8, color: i8, mask: u64) {
         self.pieces[self.piece_index(piece, color).unwrap()] = mask;
     }
 
-    // helper: map piece (1..6) and color (WHITE/BLACK) to pieces[] index (0..11)
+    /// helper: map piece (1..6) and color (WHITE/BLACK) to pieces[] index (0..11)
     pub fn piece_index(&self, piece: u8, color: i8) -> Option<usize> {
         // a lot of functions depend on this, so panic on invalid input
         if piece == 0 || piece > 6 {
-            panic!("Invalid piece type");
+            /*self.print_history();*/
+            panic!("Invalid piece type: {},", piece);
         }
         if color == WHITE {
             Some((piece - 1) as usize)
@@ -82,20 +87,20 @@ impl Chessboard {
     }
 
     pub fn get_white_pieces(&self) -> u64 {
-        self.white_pieces
+        self.white_pieces.clone()
     }
     pub fn set_white_pieces(&mut self, white_pieces: u64) {
         self.white_pieces = white_pieces;
     }
     pub fn get_black_pieces(&self) -> u64 {
-        self.black_pieces
+        self.black_pieces.clone()
     }
     pub fn set_black_pieces(&mut self, black_pieces: u64) {
         self.black_pieces = black_pieces;
     }
 
     pub fn get_castling_en_passant(&self) -> u8 {
-        self.castling_en_passant
+        self.castling_en_passant.clone()
     }
     pub fn set_castling_en_passant(&mut self, castling_en_passant: u8) {
         self.castling_en_passant = castling_en_passant;
@@ -147,8 +152,8 @@ impl Chessboard {
                 if piece_type == EMPTY {
                     print!("  |");
                 } else {
-                    if (piece_type as usize) < 0 {
-                        print!("{:?}|", piece_type);
+                    if piece.1 < 0 {
+                        print!("-{:?}|", piece_type);
                     } else {
                         print!(" {:?}|", piece_type);
                     }
@@ -158,41 +163,23 @@ impl Chessboard {
         }
     }
 
-    // Make a move and add the current state of the board to the history stack
+    /// Make a move and add the current state of the board to the history stack
     pub fn make_move(&mut self, mv: Move) {
-        //todo refactor move first
-
         // Add the current board state to the history stack
         self.history.push(self.clone());
-
-        // Update the board state
-        /*let from_x = mv.get_from_x();
-        let from_y = mv.get_from_y();
-        let to_x = mv.get_to_x();
-        let to_y = mv.get_to_y();
-        let piece = self.get_piece_at(from_x + from_y * 8);
-        let piece_type = piece.get_piece_type();
-        let color = piece.get_color();
-        if piece_type == EMPTY {
-            self.print_board();
-            panic!("No piece at {} {}", from_x, from_y)
-        };*/
-
         let from = mv.get_from_mask();
         let to = mv.get_to_mask();
         let (piece_type, color) = self.get_piece_at(from);
-
-
         self.move_piece(piece_type, color, from, to);
     }
 
-    /*
+    /**
       Move a piece from one square to another ONLY ON THE PIECE'S OWN BITBOARD
-      The move_piece and remove_piece functions should assume that the move is valid and legal similarly to piece_index
+      The move_piece and remove_piece functions assume that the move is valid and legal
      */
     //todo en pessant, castling, promotion
     fn move_piece(&mut self, piece: u8, color: i8, from: u64, to: u64) {
-        let array_index = self.piece_index(piece, color).unwrap();
+        let array_index= self.piece_index(piece, color).unwrap();
 
         //remove any piece that might be on the destination square
         for p in 1..=6 {
@@ -207,10 +194,10 @@ impl Chessboard {
         self.pieces[array_index] &= !from; //remove piece from starting square
         self.pieces[array_index] |= to; //add piece to destination square
 
-        if self.white_pieces & from != 0 {
+        if (self.white_pieces & from) != 0 {
             self.white_pieces &= !from;
             self.white_pieces |= to;
-        } else if self.black_pieces & from != 0 {
+        } else if (self.black_pieces & from) != 0 {
             self.black_pieces &= !from;
             self.black_pieces |= to;
         } else {
@@ -218,22 +205,28 @@ impl Chessboard {
         }
     }
 
-    // Undo the last move by setting the current board state to the previous state
+    /// Undo the last move by setting the current board state to the previous state
     pub fn undo_move(&mut self) {
         if let Some(prev_state) = self.history.pop() {
             *self = prev_state;
         }
     }
 
-    /**
-    * Returns the current board state as a JSON string
-    * The JSON string is formatted as follows:
-    * {
+    ///Returns the current board state as a JSON string, flipped since this is only used for the frontend where white is on the bottom
+/* {
     *   board: [
     *       [black_rook, black_knight, black_bishop, black_queen, black_king, black_bishop, black_knight, black_rook],
     *       [black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn],
     *       [empty, empty, empty, empty, empty, empty, empty, empty],
-        */
+    *       [empty, empty, empty, empty, empty, empty, empty, empty],
+    *       [empty, empty, empty, empty, empty, empty, empty, empty],
+    *       [empty, empty, empty, empty, empty, empty, empty, empty],
+    *       [empty, empty, empty, empty, empty, empty, empty, empty],
+    *       [white_pawn, white_pawn, white_pawn, white_pawn, white_pawn, white_pawn, white_pawn, white_pawn],
+    *       [white_rook, white_knight, white_bishop, white_queen, white_king, white_bishop, white_knight, white_rook],
+    *    ]
+    * }
+ */
     pub(crate) fn convert_to_json(&mut self) -> String {
         let mut json = String::new();
         json.push_str("{\n");
@@ -277,5 +270,15 @@ impl Chessboard {
         json.push_str("\t]\n");
         json.push_str("}\n");
         json
+    }
+
+    fn print_history(&self) {
+        println!("Chessboard history \n -----------------");
+        let mut i = 0;
+        for entry in self.history.clone() {
+            println!("Entry {}: ", i);
+            entry.print_board();
+            i += 1;
+        }
     }
 }
