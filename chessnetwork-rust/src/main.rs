@@ -10,31 +10,16 @@ mod r#move;
 mod engine;
 mod heuristics;
 #[path = "api/server.rs"] mod server;
-mod bitboards;
-define_bitboard_consts!();
+mod constants;
+define_consts!();
 
 // Piece constants, used instead of enums for performance reasons, also easier to eg. convert a white pawn to a black pawn by multiplying by -1
-pub const PAWN: u8 = 1;
-pub const KNIGHT: u8 = 2;
-pub const BISHOP: u8 = 3;
-pub const ROOK: u8 = 4;
-pub const QUEEN: u8 = 5;
-pub const KING: u8 = 6;
-pub const EMPTY: u8 = 0;
 
-pub const WHITE: i8 = 1;
-pub const BLACK: i8 = -1;
-pub const NONE: i8 = 0;
 
 
 
 fn main() {
-    let mut board = Chessboard::default();
-    board.init();
-    let board_string = board_to_key(&board);
-    board.print_board();
-    key_to_board(board_string).print_board()
-    /*setup();*/
+    setup();
 }
 
 

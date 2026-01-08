@@ -1,8 +1,4 @@
-/target/
-/src/main/resources/openingbook
-/target/classes/*
-/target/generated-sources/*
-/target/maven-archiver/*
-/target/maven-status/*
-/target/untitled1-1.0-SNAPSHOT.jar
-/chessnetwork-rust/target/
+/chessnetwork-rust/target/*
+/chessnetwork-rust/chessnetwork-rust.iml
+/chessnetwork-rust/.vs/*
+/.idea/*

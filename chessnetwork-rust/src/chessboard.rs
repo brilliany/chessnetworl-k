@@ -1,23 +1,5 @@
-use std::sync::mpsc::channel;
 use crate::*;
 use crate::r#move::Move;
-
-
-//starting position bitboards for each piece type
-const STARTING_POS : &[(u8, i8, u64)] = &[
-    (PAWN, WHITE, 0x000000000000FF00),
-    (PAWN, BLACK, 0x00FF000000000000),
-    (KNIGHT, BLACK, (1u64 << 57) | (1u64 << 62)),
-    (KNIGHT, WHITE, (1u64 << 1)  | (1u64 << 6)),
-    (BISHOP, BLACK, (1u64 << 58) | (1u64 << 61)),
-    (BISHOP, WHITE, (1u64 << 2)  | (1u64 << 5)),
-    (ROOK, BLACK, (1u64 << 56) | (1u64 << 63)),
-    (ROOK, WHITE, (1u64 << 0)  | (1u64 << 7)),
-    (QUEEN, BLACK, (1u64 << 59)),
-    (QUEEN, WHITE, (1u64 << 3)),
-    (KING, BLACK, (1u64 << 60)),
-    (KING, WHITE, (1u64 << 4)),
-];
 
 
 #[derive(Default, Debug)]
@@ -281,4 +263,9 @@ impl Chessboard {
             i += 1;
         }
     }
+}
+
+
+struct ZobristTable {
+
 }
