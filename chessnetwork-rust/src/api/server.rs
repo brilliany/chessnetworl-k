@@ -8,6 +8,7 @@ use cookie::Cookie;
 use std::sync::Mutex;
 use std::{thread, time};
 use std::any::Any;
+use serde::__private228::de::borrow_cow_bytes;
 use crate::engine::Engine;
 use crate::{get_config_value, print_bitboard_as_chessboard, BLACK, WHITE};
 use crate::movegenerator::{generate_moves, get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
@@ -243,20 +244,6 @@ async fn get_black_king_png() -> impl Responder {
 
 #[get("/api/possible-moves")]
 async fn possible_moves(req: HttpRequest) -> impl Responder {
-    /* request:
-    fetch("/api/get-possible-moves", {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            credentials: "include",
-            body: {
-                "session_id": sessionId,
-                "x": squareElement.cellIndex,
-                "y": squareElement.parentElement.rowIndex
-                "piece": pieceElement.id
-            }
-     */
     let session = check_session(&req);
 
     let queries = req.query_string();
@@ -285,22 +272,29 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
             }
         }
     }
+
     let chessboard = &session.board;
     let moves = generate_moves(chessboard, color);
 
-    //remove moves that don't start from (x, y)
+    // Filter moves that match the correct coordinates
     let moves: Vec<Move> = moves.into_iter().filter(|mv| {
         mv.get_from_x() == x && mv.get_from_y() == y
     }).collect();
 
-    //the frontend wants coordinates
     let moves_str: Vec<String> = moves.iter().map(|mv| {
-        format!("{{\"from_x\":{},\"from_y\":{},\"to_x\":{},\"to_y\":{}}}",
-                mv.get_from_x(), mv.get_from_y(), mv.get_to_x(), mv.get_to_y())
+        format!(
+            "{{\"from_x\":{},\"from_y\":{},\"to_x\":{},\"to_y\":{}}}",
+            mv.get_from_x(),
+            mv.get_from_y(),
+            mv.get_to_x(),
+            mv.get_to_y()
+        )
     }).collect();
 
     HttpResponse::Ok().json(format!("{{\"moves\": [{}]}}", moves_str.join(",")))
 }
+
+
 #[get("/other/engine-icon.png")]
 async fn engine_icon() -> impl Responder {
     let path = format!("web/other/engine-icon.png");
@@ -362,12 +356,17 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
             }
         }
     }
-    println!("From x: {}, From y: {}, To x: {}, To y: {}, Piece: {}", from_x, from_y, to_x, to_y, piece);
+    let chessboard = session.get_board_state();
     session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
 
     println!("Currently there are {} sessions", get_session_count());
     println!("Session: {} board now looks like this:", session.get_id());
-    session.get_board_state().print_board();
+    println!("White pieces:");
+    print_bitboard_as_chessboard(chessboard.get_white_pieces());
+    println!("Black pieces:");
+    print_bitboard_as_chessboard(chessboard.get_black_pieces());
+
+    chessboard.print_board();
 
     HttpResponse::Ok()
 }

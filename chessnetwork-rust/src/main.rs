@@ -1,8 +1,5 @@
-use config::{FileFormat, Config, File, Source};
-use config::ValueKind::I128;
 use crate::chessboard::Chessboard;
-use crate::engine::{board_to_key, key_to_board, Engine};
-use crate::r#move::Move;
+use config::{Config, File, FileFormat};
 
 mod chessboard;
 mod movegenerator;
@@ -12,11 +9,6 @@ mod heuristics;
 #[path = "api/server.rs"] mod server;
 mod constants;
 define_consts!();
-
-// Piece constants, used instead of enums for performance reasons, also easier to eg. convert a white pawn to a black pawn by multiplying by -1
-
-
-
 
 fn main() {
     setup();
