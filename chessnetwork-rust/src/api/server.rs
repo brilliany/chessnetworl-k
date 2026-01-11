@@ -8,6 +8,7 @@ use cookie::Cookie;
 use std::sync::Mutex;
 use std::{thread, time};
 use std::any::Any;
+use std::time::Duration;
 use serde::__private228::de::borrow_cow_bytes;
 use crate::engine::Engine;
 use crate::{get_config_value, print_bitboard_as_chessboard, BLACK, FILE_A, RANK_0, WHITE};
@@ -329,7 +330,7 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
     let mut from_y= INVALID_MOVE_VAL;
     let mut to_x= INVALID_MOVE_VAL;
     let mut to_y= INVALID_MOVE_VAL;
-    let mut piece = String::new();
+
     for query in queries {
         let query = query.split("=");
         let mut query = query.into_iter();
@@ -348,9 +349,6 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
             "to_y" => {
                 to_y = value.parse::<u8>().unwrap();
             }
-            "piece" => {
-                piece = value.to_string();
-            }
             _ => {
                 println!("Invalid key");
             }
@@ -361,11 +359,6 @@ async fn move_piece(req: HttpRequest) -> impl Responder {
 
     println!("Currently there are {} sessions", get_session_count());
     println!("Session: {} board now looks like this:", session.get_id());
-    println!("White pieces:");
-    print_bitboard_as_chessboard(chessboard.get_white_pieces());
-    println!("Black pieces:");
-    print_bitboard_as_chessboard(chessboard.get_black_pieces());
-
     chessboard.print_board();
 
     HttpResponse::Ok()

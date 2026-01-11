@@ -14,6 +14,7 @@ use crate::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 
 use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
+use std::time::Duration;
 use crate::chessboard::Chessboard;
 use crate::{BLACK, EMPTY, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
@@ -21,8 +22,10 @@ use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::heuristics::Heuristics;
 
-const MIN_SCORE: i32 = i32::MIN;
-const MAX_SCORE: i32 = i32::MAX;
+//was stupidly set to i32:MIN which made it underflow in places where we needed it to go lower
+//now just arbitrary low number that scores will never reach
+const MIN_SCORE: i32 = -100_000;
+const MAX_SCORE: i32 = 100_000;
 
 //todo maybe store scoring parameters in a config?
 

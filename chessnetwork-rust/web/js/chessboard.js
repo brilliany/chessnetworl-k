@@ -94,7 +94,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
-    let listenerFunction = function () {
+    let listenerFunction = async function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
             removePossibleMoves();
@@ -104,11 +104,11 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
         // Path: /api/get-possible-moves, returns a json with the possible moves for the piece
         // ex. { "possible_moves": [x1, y1, x2, y2]
         let queries = [
-            ["x", 7-x],
-            ["y", 7-y],
+            ["x", 7 - x],
+            ["y", 7 - y],
             ["color", color],
         ];
-        fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
+        await fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -119,14 +119,15 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
                 response.json().then((data) => {
                     let possibleMoves = JSON.parse(data).moves;
                     for (let i = 0; i < possibleMoves.length; i++) {
-                        const toX = 7- possibleMoves[i].to_x;
-                        const toY = 7- possibleMoves[i].to_y;
+                        const toX = 7 - possibleMoves[i].to_x;
+                        const toY = 7 - possibleMoves[i].to_y;
                         const toSquare = document.getElementById("row" + toY).children[toX];
+                        console.log("Possible move added")
                         toSquare.classList.add("possible-move");
                         let possibleMoveListener = function () {
                             makeMove(x, y, toX, toY, piece_name);
                         };
-                        toSquare.addEventListener("click", possibleMoveListener, { once: true });
+                        toSquare.addEventListener("click", possibleMoveListener, {once: true});
                         savedPossibleMoves.push({
                             location: [toX, toY],
                             listenerFunction: possibleMoveListener,
@@ -142,7 +143,7 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
     return listenerFunction;
 }
 
-function makeMove(x, y, toX, toY, pieceName) {
+function makeMove(x, y, toX, toY) {
     // Path: /api/move-piece, moves a piece
     let queries = [
         //we have to flip the board for the internal board
@@ -150,7 +151,6 @@ function makeMove(x, y, toX, toY, pieceName) {
         ["from_y", 7-y],
         ["to_x", 7-toX],
         ["to_y", 7-toY],
-        ["piece", pieceName],
     ]
     fetch("/move-piece" + "?" + new URLSearchParams(queries), {
         method: "POST",
