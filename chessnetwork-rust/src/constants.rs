@@ -3,6 +3,7 @@ use crate::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
 #[macro_export]
 macro_rules! define_consts {
     () => {
+
         pub const PAWN: u8 = 1;
         pub const KNIGHT: u8 = 2;
         pub const BISHOP: u8 = 3;

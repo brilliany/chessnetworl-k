@@ -40,8 +40,8 @@ pub(crate) struct Engine {
 
 impl Engine {
     pub fn new_single(depth: i32, color: i8) -> Self {
-        let transposition_table = TranspositionTable::new(20000);
-        let killer_moves = HashMap::new();
+        let transposition_table = TranspositionTable::new(8192);
+        let killer_moves = HashMap::with_capacity(10_000);
         Engine {
             depth,
             color,
@@ -76,8 +76,7 @@ impl Engine {
 
             //move ordering
             moves.sort_by_cached_key(|m| {
-                let killer_score = self.killer_moves.get(m).unwrap_or(&0);
-                let transposition_score = if let Some(entry) = self.transposition_table.get(chessboard.get_hash()) {
+                -(if let Some(entry) = self.transposition_table.get(chessboard.get_hash()) {
                     if let Some(tt_move) = entry.best_move {
                         if *m == tt_move { 1000 } else { 0 }
                     } else {
@@ -85,8 +84,7 @@ impl Engine {
                     }
                 } else {
                     0
-                };
-                -(killer_score + transposition_score)
+                })
             });
 
             // Time per depth-unit on average increases almost exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
@@ -212,6 +210,7 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
                     depth,
                     best_move,
                     bound_type: LowerBound});
+                //if we caused a cutoff, add this move to killer moves so that we skip the branch as soon as possible if we find it again
                 killer_moves.insert(best_move.unwrap(), best_score);
                 break;
             }

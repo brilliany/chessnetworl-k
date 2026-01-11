@@ -167,7 +167,6 @@ pub(crate) fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut V
         let mut targets = move_mask;
         while targets != 0 {
             let to = 1u64 << targets.trailing_zeros();
-
             moves.push(Move::new(from, to));
             targets &= targets - 1;
         }
@@ -179,7 +178,7 @@ pub(crate) fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut V
 
 pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
     // if queen_mask is Some, use that as the bishop mask, otherwise use the bishops from the chessboard
-    let bishop_mask = if let Some(q_mask) = queen_mask {
+    let mut bishop_mask = if let Some(q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(BISHOP, WHITE).clone()
@@ -190,56 +189,61 @@ pub(crate) fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut V
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
     let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
 
-    for square in 0..64 {
-        if (bishop_mask & (1 << square)) == 0 { continue; }
-        let x = square % 8;
-        let y = square / 8;
-        let mut move_mask:u64 = 0;
-        for i in 1..8 {
-            //break at board end
-            if x + i > 7 || y + i > 7 { break; }
-            //add i to both x and y for this clause because were moving diagonally down
-            move_mask |= 1 << (x + i + (y + i) * 8);
-            //break when we find a piece but we also include the piece
-            if (all_pieces & (1 << (x + i + (y + i) * 8))) != 0 { break; }
-        }
-        // repeat for rest of diagonals
-        for i in 1..8 {
-            if x - i < 0 || y - i < 0 { break; }
-            move_mask |= 1 << (x - i + (y - i) * 8);
-            if (all_pieces & (1 << (x - i + (y - i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x + i > 7 || y - i < 0 { break; }
-            move_mask |= 1 << (x + i + (y - i) * 8);
-            if (all_pieces & (1 << (x + i + (y - i) * 8))) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x - i < 0 || y + i > 7 { break; }
-            move_mask |= 1 << (x - i + (y + i) * 8);
-            if (all_pieces & (1 << (x - i + (y + i) * 8))) != 0 { break; }
-        }
+    let mut move_mask:u64 = 0;
 
-        move_mask &= !own_pieces; // dont eat own pieces
-        /*for i in 0..64 {
-            if (move_mask & (1 << i)) != 0 {
-                moves.push(Move::new(x as u8, y as u8, i % 8 as u8, i / 8 as u8));
+    while bishop_mask != 0 {
+        let from = 1u64 << bishop_mask.trailing_zeros();
+        if (from & (RANKS[7] | FILES[7])) == 0 {
+            for i in 1..8 {
+                let dest = from << 9 * i;
+                move_mask |= dest &! own_pieces;
+                if (dest & ((RANKS[7] | FILES[7]) | all_pieces)) != 0 {
+                    break;
+                }
             }
-        }*/
-
-        let mut temp_mask = move_mask;
-        while temp_mask != 0 {
-            let from_square = 1u64 << square;
-            let to_square = 1u64 << temp_mask.trailing_zeros();
-            moves.push(Move::new(from_square, to_square));
-            temp_mask &= temp_mask - 1;
         }
+
+        if (from & (RANKS[0] | FILES[7])) == 0 {
+            for i in 1..8 {
+                let dest = from >> 7 * i;
+                move_mask |= dest & !own_pieces;
+                if (dest & ((RANKS[0] | FILES[7]) | all_pieces)) != 0 {
+                    break;
+                }
+            }
+        }
+        if (from & (RANKS[7] | FILES[0])) == 0 {
+            for i in 1..8 {
+                let dest = from << 7 * i;
+                move_mask |= dest & !own_pieces;
+                if (dest & ((FILES[0] | RANKS[7]) | all_pieces)) != 0 {
+                    break;
+                }
+            }
+        }
+        if (from & (RANKS[0] | FILES[0])) == 0 {
+            for i in 1..8 {
+                let dest = from >> 9 * i;
+                move_mask |= dest & !own_pieces;
+                if (dest & ((FILES[0] | RANKS[0]) | all_pieces)) != 0 {
+                    break;
+                }
+            }
+        }
+
+        move_mask &= !own_pieces;
+        while move_mask != 0 {
+            let to = 1u64 << move_mask.trailing_zeros();
+            moves.push(Move::new(from, to));
+            move_mask &= move_mask - 1;
+        }
+        bishop_mask &= bishop_mask - 1;
     }
 }
 
 // same logic as bishop but for straight lines
 pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
-    let rook_mask = if let Some(q_mask) = queen_mask {
+    let mut rook_mask = if let Some(q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(ROOK, WHITE)
@@ -251,41 +255,62 @@ pub(crate) fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
     let all_pieces = chessboard.get_white_pieces() | chessboard.get_black_pieces();
     if color == 1 { chessboard.get_black_pieces() } else { chessboard.get_white_pieces() };
 
-    for square in 0..64 {
-        if (rook_mask & (1 << square)) == 0 { continue; }
-        let x = square % 8;
-        let y = square / 8;
-        let mut move_mask:u64 = 0;
-        for i in 1..8 {
-            if x + i > 7 { break; }
-            move_mask |= 1 << (x + i + y * 8);
-            if all_pieces & (1 << (x + i + y * 8)) != 0 { break; }
-        }
-        for i in 1..8 {
-            if x - i < 0 { break; }
-            move_mask |= 1 << (x - i + y * 8);
-            if all_pieces & (1 << (x - i + y * 8)) != 0 { break; }
-        }
-        for i in 1..8 {
-            if y + i > 7 { break; }
-            move_mask |= 1 << (x + (y + i) * 8);
-            if all_pieces & (1 << (x + (y + i) * 8)) != 0 { break; }
 
+    let mut move_mask:u64 = 0;
+    while rook_mask != 0 {
+        let from = 1u64 << rook_mask.trailing_zeros();
+        if (from & RANKS[7]) == 0 {
+            //upwards from white perspective
+            for i in 1..8 {
+                let dest = from << 8 * i;
+                move_mask |= dest &! own_pieces;
+                //stop on own pieces and last rank
+                if dest & (RANKS[7] | all_pieces) != 0 {
+                    break;
+                }
+            }
         }
-        for i in 1..8 {
-            if y - i < 0 { break; }
-            move_mask |= 1 << (x + (y - i) * 8);
-            if (all_pieces & (1 << (x + (y - i) * 8))) != 0 { break; }
+
+        if (from & RANKS[0]) == 0 {
+            //down
+            for i in 1..8 {
+                let dest = from >> 8 * i;
+                move_mask |= dest & !own_pieces;
+                //stop on own pieces and last rank
+                if dest & (RANKS[0] | all_pieces) != 0 {
+                    break;
+                }
+            }
+        }
+        if (from & FILES[7]) == 0 {
+            //left
+            for i in 1..8 {
+                let dest = from << 1 * i;
+                move_mask |= dest & !own_pieces;
+                //stop on own pieces and last rank
+                if dest & (FILES[7] | all_pieces) != 0 {
+                    break;
+                }
+            }
+        }
+        if (from & FILES[0]) == 0 {
+            for i in 1..8 {
+                let dest = from >> 1 * i;
+                move_mask |= dest & !own_pieces;
+                //stop on own pieces and last rank
+                if dest & (FILES[0] | all_pieces) != 0 {
+                    break;
+                }
+            }
         }
 
         move_mask &= !own_pieces;
-        let mut temp_mask = move_mask;
-        while temp_mask != 0 {
-            let from_square = 1u64 << square;
-            let to_square = 1u64 << temp_mask.trailing_zeros();
-            moves.push(Move::new(from_square, to_square));
-            temp_mask &= temp_mask - 1;
+        while move_mask != 0 {
+            let to = 1u64 << move_mask.trailing_zeros();
+            moves.push(Move::new(from, to));
+            move_mask &= move_mask - 1;
         }
+        rook_mask &= rook_mask - 1;
     }
 }
 
@@ -307,14 +332,16 @@ pub(crate) fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec
         let mut move_mask = 0u64;
 
         //left
-        move_mask |= ((from &! FILES[0]) << 1)
-            | ((from &! (FILES[0] | RANKS[7])) << 9)
+        move_mask |= ((from &! FILES[0]) >> 1)
+            | ((from &! (FILES[0] | RANKS[7])) >> 9)
+            | ((from &! (FILES[7] | RANKS[7])) >> 7)
             | ((from &! RANKS[0]) >> 8)
             | ((from &! RANKS[7]) << 8);
 
         //ect
-        move_mask |= ((from &! FILES[7]) >> 1)
-            | ((from &! (FILES[7] | RANKS[7])) >> 7)
+        move_mask |= ((from &! FILES[7]) << 1)
+            | ((from &! (FILES[0] | RANKS[7])) << 7)
+            | ((from &! (FILES[7] | RANKS[7])) << 9)
             | ((from &! RANKS[0]) >> 8)
             | ((from &! RANKS[7]) << 8);
 

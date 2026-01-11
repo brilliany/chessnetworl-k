@@ -122,8 +122,7 @@ impl Chessboard {
     }
 
     pub(crate) fn print_board(&self) {
-        println!("  A B C D E F G H");
-        println!("  - - - - - - - -");
+        println!();
         for i in 0..8 {
             print!("{}|", 8 - i);
             for j in 0..8 {
@@ -141,13 +140,18 @@ impl Chessboard {
             }
             println!();
         }
+        println!("   A  B  C  D  E  F  G  H");
+
     }
 
     /// Make a move and add the current state of the board to the history stack
     pub fn make_move(&mut self, mv: Move) {
         let zobrist: &ZobristTable = &*ZOBRIST;
         // Save current state to history (for undo)
-        self.history.push(self.clone());
+        let mut state_to_save = self.clone();
+        // Save only the board state, undo then clones the full history back in
+        state_to_save.history = Vec::new();
+        self.history.push(state_to_save);
 
         let from = mv.get_from_mask();
         let to = mv.get_to_mask();
@@ -278,9 +282,9 @@ impl Chessboard {
 
    /// Undo the last move by setting the current board state to the previous state
    pub fn undo_move(&mut self) {
-       // Pop the last board state from history
-       if let Some(prev_state) = self.history.pop() {
-           // Fully restore all board and auxiliary states
+       if let Some(mut prev_state) = self.history.pop() {
+           // We need to move the current history (minus the popped state) back into the restored state
+           prev_state.history = std::mem::take(&mut self.history);
            *self = prev_state;
        } else {
            panic!("Cannot undo move: history is empty");

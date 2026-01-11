@@ -10,7 +10,7 @@ use std::{thread, time};
 use std::any::Any;
 use serde::__private228::de::borrow_cow_bytes;
 use crate::engine::Engine;
-use crate::{get_config_value, print_bitboard_as_chessboard, BLACK, WHITE};
+use crate::{get_config_value, print_bitboard_as_chessboard, BLACK, FILE_A, RANK_0, WHITE};
 use crate::movegenerator::{generate_moves, get_bishop_moves, get_king_moves, get_knight_moves, get_pawn_moves, get_queen_moves, get_rook_moves};
 use crate::r#move::Move;
 use crate::chessboard::Chessboard;
@@ -275,7 +275,7 @@ async fn possible_moves(req: HttpRequest) -> impl Responder {
 
     let chessboard = &session.board;
     let moves = generate_moves(chessboard, color);
-
+    chessboard.print_board();
     // Filter moves that match the correct coordinates
     let moves: Vec<Move> = moves.into_iter().filter(|mv| {
         mv.get_from_x() == x && mv.get_from_y() == y
@@ -378,13 +378,12 @@ async fn make_engine_move(req: HttpRequest) -> impl Responder {
     println!("Engine making move for session: {}", session.get_id());
     board.print_board();
     //for now just make a new_single engine and ask for a move
-    let mut engine = Engine::new_single(6, BLACK);
+    let mut engine = Engine::new_single(60, BLACK);
     let engine_move = engine.get_best_move(&mut board).unwrap();
     let from_x = engine_move.get_from_x();
     let from_y = engine_move.get_from_y();
     let to_x = engine_move.get_to_x();
     let to_y = engine_move.get_to_y();
-    println!("Engine move: {}, {}, {}, {}", from_x, from_y, to_x, to_y);
     session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
     let move_obj = String::new()
         + "{\"from_x\":" + &from_x.to_string()
