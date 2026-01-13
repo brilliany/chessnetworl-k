@@ -31,11 +31,8 @@ async function initialRequest(sessionId) {
  *     </div>
  *     <-- ... -->
  */
-function populateBoard() {
-    // Path: /api/populate-board, returns a json with the board with the pieces
-// ex. { "white_pawns": <white pawns bitboard>
-//       "white_rooks": <white rooks bitboard>
 
+function populateBoard() {
     fetch("/api/populate-board", {
         method: "GET",
         headers: {
@@ -44,33 +41,28 @@ function populateBoard() {
         credentials: "include",
     }).then((response) => {
         if (response.status === 200) {
-        /*
-            * The JSON string is formatted as follows:
-    * {
-    *   board: [
-    *       [black_rook, black_knight, black_bishop, black_queen, black_king, black_bishop, black_knight, black_rook],
-    *       [black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn, black_pawn],
-    *       [empty, empty, empty, empty, empty, empty, empty, empty],
-        */
             response.json().then((data) => {
                 console.log(data);
                 const board = JSON.parse(data).board;
-                for (let i = 0; i < board.length; i++) {
-                    const row = board[i];
+
+                // Make 0th rank the top row for white by flipping indices
+                const flippedBoard = color === 1 ? board.slice().reverse() : board;
+
+                for (let i = 0; i < flippedBoard.length; i++) {
+                    const row = flippedBoard[i];
                     const rowElement = document.getElementById("row" + i);
                     for (let j = 0; j < row.length; j++) {
-                        const piece_name = row[j];
+                        const piece_name = row[7-j];
                         const squareElement = rowElement.children[j];
                         console.log("squareElement has " + squareElement.children.length + " children");
                         if (piece_name !== "empty") {
-                            addPieceToSquare(squareElement, piece_name,j, i);
+                            addPieceToSquare(squareElement, piece_name, j, i);
                         } else {
                             squareElement.children[0].innerHTML = "";
                         }
                     }
                 }
             });
-
         } else {
             alert("Could not populate board");
         }
@@ -102,7 +94,7 @@ function addPieceToSquare(squareElement, piece_name,x,y) {
     })
 }
 function addListenerToPiece(pieceImg, piece_name, x, y) {
-    let listenerFunction = function () {
+    let listenerFunction = async function () {
         if (savedPossibleMoves.length > 0) {
             //remove all possible move squares
             removePossibleMoves();
@@ -112,36 +104,34 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
         // Path: /api/get-possible-moves, returns a json with the possible moves for the piece
         // ex. { "possible_moves": [x1, y1, x2, y2]
         let queries = [
-            ["x", x],
-            ["y", y],
+            ["x", 7 - x],
+            ["y", 7 - y],
             ["color", color],
-        ]
-        fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
+        ];
+        await fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
             },
             credentials: "include",
-
         }).then((response) => {
             if (response.status === 200) {
                 response.json().then((data) => {
                     let possibleMoves = JSON.parse(data).moves;
                     for (let i = 0; i < possibleMoves.length; i++) {
-                        const toX = possibleMoves[i].to_x;
-                        const toY = possibleMoves[i].to_y;
+                        const toX = 7 - possibleMoves[i].to_x;
+                        const toY = 7 - possibleMoves[i].to_y;
                         const toSquare = document.getElementById("row" + toY).children[toX];
+                        console.log("Possible move added")
                         toSquare.classList.add("possible-move");
                         let possibleMoveListener = function () {
                             makeMove(x, y, toX, toY, piece_name);
                         };
                         toSquare.addEventListener("click", possibleMoveListener, {once: true});
-                        savedPossibleMoves.push(
-                            {
-                                location: [toX, toY],
-                                listenerFunction: possibleMoveListener,
-                            }
-                        )
+                        savedPossibleMoves.push({
+                            location: [toX, toY],
+                            listenerFunction: possibleMoveListener,
+                        });
                     }
                 });
             } else {
@@ -153,14 +143,14 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
     return listenerFunction;
 }
 
-function makeMove(x, y, toX, toY, pieceName) {
+function makeMove(x, y, toX, toY) {
     // Path: /api/move-piece, moves a piece
     let queries = [
-        ["from_x", x],
-        ["from_y", y],
-        ["to_x", toX],
-        ["to_y", toY],
-        ["piece", pieceName],
+        //we have to flip the board for the internal board
+        ["from_x", 7-x],
+        ["from_y", 7-y],
+        ["to_x", 7-toX],
+        ["to_y", 7-toY],
     ]
     fetch("/move-piece" + "?" + new URLSearchParams(queries), {
         method: "POST",
@@ -183,6 +173,7 @@ function movePiece(x, y, toX, toY) {
     const fromSquare = document.getElementById("row" + y).children[x];
     const toSquare = document.getElementById("row" + toY).children[toX];
     let first = fromSquare.children[0];
+    let pawn = first.children[0].getAttribute("alt").endsWith("pawn");
     console.log(first.children[0])
     if (first.children[0] === undefined) {
         alert("No piece to move");
@@ -192,6 +183,8 @@ function movePiece(x, y, toX, toY) {
     //if piece on toSquare, remove it
     if (toSquare.children[0].children.length > 0) {
         toSquare.children[0].children[0].remove();
+    } else if (pawn && toX !== x) {
+        document.getElementById("row" + (toY + color)).children[toX].children[0].children[0].remove()
     }
     //remove piece from fromSquare
     first.innerHTML = "";
@@ -247,10 +240,10 @@ function makeEngineMove() {
             response.json().then((response) => {
                 let json = JSON.parse(response);
                 console.log(json)
-                const fromX = json.from_x;
-                const fromY = json.from_y;
-                const toX = json.to_x;
-                const toY = json.to_y;
+                const fromX = 7 - json.from_x;
+                const fromY = 7 - json.from_y;
+                const toX = 7 - json.to_x;
+                const toY = 7 - json.to_y;
                 movePiece(fromX, fromY, toX, toY);
                 unfreezeBoard();
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);

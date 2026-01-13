@@ -14,6 +14,7 @@ use crate::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 
 use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::thread;
+use std::time::Duration;
 use crate::chessboard::Chessboard;
 use crate::{BLACK, EMPTY, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
@@ -21,18 +22,12 @@ use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::heuristics::Heuristics;
 
-const MIN_SCORE: i32 = i32::MIN + 30_000;
-const MAX_SCORE: i32 = i32::MAX - 30_000;
+//was stupidly set to i32:MIN which made it underflow in places where we needed it to go lower
+//now just arbitrary low number that scores will never reach
+const MIN_SCORE: i32 = -100_000;
+const MAX_SCORE: i32 = 100_000;
 
-//todo separate analysis and search mode, analysis takes a depth parameter, search takes a time parameter and uses iterative deepening
 //todo maybe store scoring parameters in a config?
-//todo zobrist hashing for transposition table, big speedup
-
-#[derive(Clone)]
-enum Mode {
-    Analysis,
-    Search,
-}
 
 //todo maybe add this to config
 // 30 seconds time cutoff in ms for search mode
@@ -40,57 +35,60 @@ const TIME_CUTOFF: u64 = 30000;
 
 #[derive(Clone)]
 pub(crate) struct Engine {
-    mode: Mode,
     depth: i32,
     color: i8,
-    max_score: i32,
-    min_score: i32,
     transposition_table: TranspositionTable,
     killer_moves: HashMap<Move, i32>,
 }
 
 impl Engine {
     pub fn new_single(depth: i32, color: i8) -> Self {
-        let transposition_table = TranspositionTable::new();
-        let killer_moves = HashMap::new();
+        let transposition_table = TranspositionTable::new(8192);
+        let killer_moves = HashMap::with_capacity(10_000);
         Engine {
-            mode: Mode::Search,
             depth,
             color,
-            max_score: i32::MAX,
-            min_score: i32::MIN,
             transposition_table,
             killer_moves,
         }
     }
 
     pub fn get_best_move(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
-        match &self.mode {
-            Mode::Analysis => {
-                None
-            }
-            Mode::Search => Some(self.start_single_search(chessboard)),
-        }
+        Some(self.start_single_search(chessboard))
     }
 
 
     fn start_single_search(&mut self, chessboard: &mut Chessboard) -> Move {
         let start = std::time::Instant::now();
 
-        let moves = generate_moves(chessboard, self.color);
+        let mut moves = generate_moves(chessboard, self.color);
+        println!("{} moves available for engine", moves.len());
         if moves.is_empty() {
             panic!("No moves available");
         }
 
         let mut best_move: Option<Move> = None;
-        let mut best_score = self.min_score;
+        let mut best_score = MIN_SCORE;
 
 
         let mut last_time = 0u64;
         // Iterative deepening loop
         for current_depth in 1..=self.depth {
-            // time
+            //time
             let start_time = std::time::Instant::now();
+
+            //move ordering
+            moves.sort_by_cached_key(|m| {
+                -(if let Some(entry) = self.transposition_table.get(chessboard.get_hash()) {
+                    if let Some(tt_move) = entry.best_move {
+                        if *m == tt_move { 1000 } else { 0 }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                })
+            });
 
             // Time per depth-unit on average increases almost exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
             if current_depth > 1 {
@@ -101,30 +99,25 @@ impl Engine {
                 }
             }
 
-            let mut alpha = self.min_score;
-            let beta = self.max_score;
+            let mut alpha = MIN_SCORE;
+            let beta = MAX_SCORE;
 
             let mut depth_best_move = None;
-            let mut depth_best_score = self.min_score;
+            let mut depth_best_score = MIN_SCORE;
 
             for mv in &moves {
-                let search = Search {
-                    max_score: self.max_score,
-                    min_score: self.min_score,
-                };
-
-                let result = search.alpha_beta(
-                    current_depth,
+                chessboard.make_move(*mv);
+                let result = alpha_beta(
+                    current_depth - 1,
                     alpha,
                     beta,
-                    self.color,
-                    true,
+                    -self.color,
+                    false,
                     chessboard,
-                    true,
                     &mut self.transposition_table,
                     &mut self.killer_moves,
                 );
-
+                chessboard.undo_move();
                 if result.score > depth_best_score {
                     depth_best_score = result.score;
                     depth_best_move = Some(*mv);
@@ -147,12 +140,13 @@ impl Engine {
             }
 
             println!(
-                "Depth {} finished: best move {} to {}, score {}, elapsed {:?}",
+                "Depth {} finished: best move {} to {}, score {}, elapsed {:?}, transposition table size {}MB",
                 current_depth,
                 best_move.unwrap().get_from_mask().trailing_zeros(),
                 best_move.unwrap().get_to_mask().trailing_zeros(),
                 best_score,
-                start.elapsed()
+                start.elapsed(),
+                std::mem::size_of::<Option<Entry>>()*self.transposition_table.size / (1024*1024)
             );
             last_time = start_time.elapsed().as_millis() as u64;
         }
@@ -161,187 +155,184 @@ impl Engine {
     }
 }
 
-pub(crate) struct Search {
-    max_score: i32,
-    min_score: i32,
-}
 
 
-//todo this will be removed when zobrist hashing is implemented
-pub fn board_to_key(board: & Chessboard) -> String {
-    let mut key = String::new();
-    for i in 0..64 {
-        let piece = board.get_piece_at(1u64 << i);
-        if piece.0 == EMPTY {
-            key.push_str("0");
-        } else {
-            key.push_str(&piece.0.to_string());
-        }
-    }
-    key
-}
-/** Key to board function
-       * undoes the board to key function
- */
-pub fn key_to_board(key: String) -> Chessboard {
-    let mut board = Chessboard::default();
-    for (i, c) in key.chars().enumerate() {
-        let piece = c.to_digit(10).unwrap() as u8;
-        if piece != 0 {
-            let bit = 1u64 << i;
-            board.set_piece_mask(piece, if piece > 0 { WHITE } else { BLACK }, board.get_piece_mask(piece, if piece > 0 { WHITE } else { BLACK }) | bit);
-        }
-    }
-    board
-}
 
 // go to the wikipedia page if you want to understand this
-impl Search {
-    fn alpha_beta(&self, depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, use_move_ordering: bool, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>) -> Result {
-        if depth == 0 {
-            let score = Self::evaluate(chessboard, color);
-            /*println!("Reached end of depth");
-            chessboard.print_board();*/
-            return Result::new(score, None);
-        }
-
-        let board_key: String = board_to_key(chessboard);
-        let mut best_move = None;
-        let mut best_score = if maximizing_player { self.min_score } else { self.max_score };
-
-        let mut moves = generate_moves(chessboard, color);
-
-        if use_move_ordering {
-            moves.sort_by_key(|mov| {
-                if killer_moves.contains_key(mov) {
-                    -killer_moves.get(mov).unwrap()
-                } else {
-                    0
-                }
-            });
-        }
-        if moves.len() == 0 {
-            return Result::new(self.min_score, None);
-        }
-
-        for mov in moves {
-            chessboard.make_move(mov);
-            let result = self.alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, true, transposition_table, killer_moves);
-            chessboard.undo_move();
-            let score = result.score;
-            if maximizing_player && score > best_score {
-                best_move = Some(mov);
-                best_score = score;
-                alpha = std::cmp::max(alpha, score);
-                if beta <= alpha {
-                    transposition_table.insert(Entry::new(board_key.clone(), best_score, depth, best_move, LowerBound));
-                    killer_moves.insert(best_move.unwrap(), best_score);
-                    break;
-                }
-            } else if !maximizing_player && score < best_score {
-                best_move = Some(mov);
-                best_score = score;
-                beta = std::cmp::min(beta, score);
-                if beta <= alpha {
-                    transposition_table.insert(Entry::new(board_key.clone(), best_score, depth, best_move, UpperBound));
-                    killer_moves.insert(best_move.unwrap(), best_score);
-                    break;
-                }
+fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>) -> Result {
+    if depth == 0 {
+        let eval_color = if maximizing_player { color } else { -color };
+        let score = evaluate(chessboard, eval_color);
+        /*println!("Reached end of depth");
+           chessboard.print_board();*/
+        return Result::new(score, None);
+    }
+    let board_key: u64 = chessboard.get_hash();
+    // Check transposition table
+    if let Some(entry) = transposition_table.get(board_key) {
+        if entry.depth >= depth {
+            // Return the stored result if the depth matches or is greater
+            match entry.bound_type {
+                BoundType::Exact => return Result::new(entry.score, entry.best_move),
+                LowerBound if entry.score > alpha => alpha = entry.score,
+                UpperBound if entry.score < beta => beta = entry.score,
+                _ => {}
+            }
+            if alpha >= beta {
+                return Result::new(entry.score, entry.best_move);
             }
         }
-        let bound_type;
-        if best_score <= alpha {
-            bound_type = UpperBound;
+    }
+    let mut best_score = if maximizing_player { MIN_SCORE } else { MAX_SCORE };
+    let mut best_move = None;
+    let mut moves = generate_moves(chessboard, color);
+    if moves.len() == 0 {
+        return Result::new(if maximizing_player { MIN_SCORE } else { MAX_SCORE }, None);
+    }
+    // Order moves based on scores (e.g., killer moves, history heuristics)
+    moves.sort_by_cached_key(|mv| {
+        if let Some(score) = killer_moves.get(mv) {
+            -*score // Prefer killer moves (higher scores first)
         } else {
-            bound_type = LowerBound;
+            0 // Default score for other moves
         }
-        transposition_table.insert(Entry::new(board_key.clone(), best_score, depth, best_move, bound_type));
-        Result::new(best_score, best_move)
-    }
-
-    pub(crate) fn evaluate(position: &Chessboard, color: i8) -> i32 {
-        let mut score = 0;
-        score += Self::material(position, color);
-        score += Self::heuristics(position, color);
-        score
-    }
-
-    fn heuristics(position: &Chessboard, color: i8) -> i32 {
-        let mut score: i32 = 0;
-        let heuristics = Heuristics::new(position, color);
-        score += heuristics.two_middle_pawns();
-
-        score += heuristics.castling();
-
-        score += heuristics.knight_outpost();
-
-        score += heuristics.development();
-
-        score += heuristics.mobility();
-
-        score
-    }
-
-    fn material(position: &Chessboard, for_color: i8) -> i32 {
-        let mut score = 0;
-        for i in 1..6 {
-            let piece_value = match i {
-                PAWN => 10,   // Pawn
-                KNIGHT => 30,   // Knight
-                BISHOP => 35,   // Bishop
-                ROOK => 50,   // Rook
-                QUEEN => 90,   // Queen
-                _ => 0,
-            };
-            if for_color == WHITE {
-                score += position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
-                score -= position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
-            } else {
-                score -= position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
-                score += position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+    });
+    for mov in moves {
+        chessboard.make_move(mov);
+        let result = alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, transposition_table, killer_moves);
+        chessboard.undo_move();
+        let score = result.score;
+        if maximizing_player && score > best_score {
+            best_move = Some(mov);
+            best_score = score;
+            alpha = std::cmp::max(alpha, score);
+            if beta <= alpha {
+                transposition_table.insert(Entry {
+                    hash: board_key,
+                    score: best_score,
+                    depth,
+                    best_move,
+                    bound_type: LowerBound});
+                //if we caused a cutoff, add this move to killer moves so that we skip the branch as soon as possible if we find it again
+                killer_moves.insert(best_move.unwrap(), best_score);
+                break;
+            }
+        } else if !maximizing_player && score < best_score {
+            best_move = Some(mov);
+            best_score = score;
+            beta = std::cmp::min(beta, score);
+            if beta <= alpha {
+                transposition_table.insert(Entry {
+                    hash: board_key,
+                    score: best_score,
+                    depth,
+                    best_move,
+                    bound_type: UpperBound});
+                killer_moves.insert(best_move.unwrap(), best_score);
+                break;
             }
         }
-        score
     }
+    let bound_type;
+    if best_score <= alpha {
+        bound_type = UpperBound;
+    } else {
+        bound_type = LowerBound;
+    }
+    transposition_table.insert(Entry {
+        hash: board_key,
+        score: best_score,
+        depth,
+        best_move,
+        bound_type});
+    Result::new(best_score, best_move)
 }
+pub(crate) fn evaluate(position: &Chessboard, color: i8) -> i32 {
+    let mut score = 0;
+    score += material(position, color);
+    score += heuristics(position, color);
+    score
+}
+fn heuristics(position: &Chessboard, color: i8) -> i32 {
+    let mut score: i32 = 0;
+    let heuristics = Heuristics::new(position, color);
+    score += heuristics.two_middle_pawns();
+    score += heuristics.castling();
+    score += heuristics.knight_outpost();
+    score += heuristics.development();
+    score += heuristics.mobility();
+    score
+}
+fn material(position: &Chessboard, for_color: i8) -> i32 {
+    let mut score = 0;
+    for i in 1..6 {
+        let piece_value = match i {
+            PAWN => 10,
+            KNIGHT => 30,
+            BISHOP => 35,
+            ROOK => 50,
+            QUEEN => 90,
+            //todo implement checkmate detection instead of just fooling the engine
+            KING => 9999,
+            _ => 0,
+        };
+        if for_color == WHITE {
+            score += position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
+            score -= position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+        } else {
+            score -= position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
+            score += position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+        }
+    }
+    score
+}
+
 #[derive(Debug, Clone)]
 struct TranspositionTable {
-    entries: Vec<Entry>,
+    // Use a fixed-size array with index = hash % size for O(1) access
+    entries: Vec<Option<Entry>>,
+    size: usize,
 }
 
-impl TranspositionTable {
-    fn new() -> Self {
-        TranspositionTable {
-            entries: Vec::new(),
-        }
-    }
-    fn get(&self, hash: String) -> Option<&Entry> {
-        self.entries.iter().find(|entry| entry.hash == hash)
-    }
-    fn insert(&mut self, entry: Entry) {
-        self.entries.push(entry);
-    }
-}
 #[derive(Debug, Clone)]
 struct Entry {
-    hash: String,
+    hash: u64,
     depth: i32,
     score: i32,
     best_move: Option<Move>,
     bound_type: BoundType,
 }
 
-impl Entry {
-    fn new(hash: String, depth: i32, score: i32, best_move: Option<Move>, bound_type: BoundType) -> Self {
-        Entry {
-            hash,
-            depth,
-            score,
-            best_move,
-            bound_type,
+impl TranspositionTable {
+    fn new(size_mb: usize) -> Self {
+        let entry_size = std::mem::size_of::<Option<Entry>>();
+        let num_entries = (size_mb * 1024 * 1024) / entry_size;
+        TranspositionTable {
+            entries:  vec![None; num_entries],
+            size: num_entries,
+        }
+    }
+
+    fn get(&self, hash: u64) -> Option<&Entry> {
+        let idx = (hash as usize) % self.size;
+        self.entries[idx]. as_ref().filter(|e| e.hash == hash)
+    }
+
+    fn insert(&mut self, entry: Entry) {
+        let idx = (entry.hash as usize) % self.size;
+        // Replace the entry if the current depth is greater, or insert it if None
+        match self.entries[idx].as_ref() {
+            Some(existing_entry) if entry.depth > existing_entry.depth => {
+                self.entries[idx] = Some(entry);
+            }
+            None => {
+                self.entries[idx] = Some(entry);
+            }
+            _ => {} // scrap if theyre the same
         }
     }
 }
+
 #[derive(Debug, Clone)]
 enum BoundType {
     Exact,

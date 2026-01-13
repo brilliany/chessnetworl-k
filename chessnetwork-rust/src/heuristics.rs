@@ -20,8 +20,7 @@ const SIXTEEN_CENTER_SQUARES: u64 = 1 << 27 | 1 << 28 | 1 << 35 | 1 << 36 | 1 <<
 
 const LEFT_BOARD_EDGE : u64 = 1 << 0 | 1 << 8 | 1 << 16 | 1 << 24 | 1 << 32 | 1 << 40 | 1 << 48 | 1 << 56;
 const RIGHT_BOARD_EDGE : u64 = 1 << 7 | 1 << 15 | 1 << 23 | 1 << 31 | 1 << 39 | 1 << 47 | 1 << 55 | 1 << 63;
-pub(crate) struct Heuristics<'a> {
-    position: &'a Chessboard,
+pub(crate) struct Heuristics{
     color: i8,
 
     white_pieces: u64,
@@ -41,9 +40,9 @@ pub(crate) struct Heuristics<'a> {
     black_kings: u64,
 }
 
-impl<'a> Heuristics<'a> {
-    pub fn new(position: &'a Chessboard, color: i8) -> Heuristics<'a> {
-        Heuristics { position, color,
+impl Heuristics {
+    pub fn new(position: &Chessboard, color: i8) -> Heuristics {
+        Heuristics { color,
             white_pieces: position.get_white_pieces(),
             black_pieces: position.get_black_pieces(),
             white_pawns: position.get_piece_mask(PAWN, WHITE),
