@@ -1,3 +1,0 @@
-mode: "HttpServerSingle"
-http_server_address: "127.0.0.1"
-http_server_port: "3333"
