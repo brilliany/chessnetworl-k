@@ -1,0 +1,128 @@
+:root {
+    --containers: #5A0834;
+    --background: #1B0112;
+    --violent-pink: #E44EC3;
+    --secondary-containers: #2a1424;
+    --white: #f0d9b5;
+    --latte: #b58863;
+    --green: #6b9141;
+    --gray: #4d4d4d;
+}
+
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--background);
+}
+
+header {
+    background-color: var(--containers);
+    color: #fff;
+    padding: 10px;
+}
+
+nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+nav li {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+nav li:last-child {
+    margin-right: 0;
+}
+
+nav a {
+    color: #fff;
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+nav a:hover {
+    background-color: var(--white);
+    color: var(--gray);
+}
+
+main {
+    margin: 20px;
+}
+
+.chessboard {
+    display: flex;
+    flex-direction: column;
+    width: 480px;
+    height: 480px;
+    margin: 10px 120px;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+}
+
+.player-info {
+    flex-direction: row;
+    width: 480px;
+    height: 80px;
+    background: var(--containers);
+    margin: 10px 120px;
+}
+
+.player-info img {
+    width: 60px;
+    height: 60px;
+}
+
+.icon-box {
+    float: left;
+    display: flex;
+    width: 150px;
+    height: 60px;
+    background: var(--secondary-containers);
+    margin: 10px 10px;
+}
+
+* p {
+    margin: 5px;
+    color: var(--violent-pink);
+    text-shadow: 1px 1px 5px black;
+}
+
+.square {
+    width: 60px;
+    height: 60px;
+}
+
+.white {
+    background-color: var(--white);
+}
+
+.black {
+    background-color: var(--latte);
+}
+
+.possible-move {
+    background-color: var(--green);
+}
+
+.small-text {
+    font-size: 0.5em;
+}
+
+.icon-text {
+    font-size: 0.3em;
+    position: absolute;
+    top: 0;
+    left: 45px;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+}

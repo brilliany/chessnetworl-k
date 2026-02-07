@@ -1,0 +1,8 @@
+[package]
+name = "chessnetworl-k"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["core", "server"]
+resolver = "2"

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/chessnetwork-rust/chessnetwork-rust.iml" filepath="$PROJECT_DIR$/chessnetwork-rust/chessnetwork-rust.iml" />
+      <module fileurl="file://$PROJECT_DIR$/chessnetworl-k.iml" filepath="$PROJECT_DIR$/chessnetworl-k.iml" />
     </modules>
   </component>
 </project>

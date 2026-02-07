@@ -1,4 +1,4 @@
-/chessnetwork-rust/target/*
-/chessnetwork-rust/chessnetwork-rust.iml
-/chessnetwork-rust/.vs/*
-/.idea/*
+/target
+/.idea/
+chessnetworl-k-core.iml
+/base-project/
