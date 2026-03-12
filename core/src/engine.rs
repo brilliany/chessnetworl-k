@@ -43,7 +43,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new_single(depth: i32, color: i8) -> Self {
-        let transposition_table = TranspositionTable::new(8192);
+        let transposition_table = TranspositionTable::new(2048);
         let killer_moves = HashMap::with_capacity(10_000);
         Engine {
             depth,
@@ -194,7 +194,7 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
         if let Some(score) = killer_moves.get(mv) {
             -*score // Prefer killer moves (higher scores first)
         } else {
-            0 // Default score for other moves
+            0 // Default score for icons moves
         }
     });
     for mov in moves {

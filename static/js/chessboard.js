@@ -1,5 +1,3 @@
-
-
 //session id from cookies
 const sessionId = getCookie("session_id");
 let color = 0;
@@ -43,7 +41,7 @@ function populateBoard() {
         if (response.status === 200) {
             response.json().then((data) => {
                 console.log(data);
-                const board = JSON.parse(data).board;
+                const board = data.board;
 
                 // Make 0th rank the top row for white by flipping indices
                 const flippedBoard = color === 1 ? board.slice().reverse() : board;
@@ -101,8 +99,6 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
             return;
         }
         console.log("Clicked on piece " + piece_name + " at " + x + ", " + y);
-        // Path: /api/get-possible-moves, returns a json with the possible moves for the piece
-        // ex. { "possible_moves": [x1, y1, x2, y2]
         let queries = [
             ["x", 7 - x],
             ["y", 7 - y],
@@ -117,7 +113,7 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
         }).then((response) => {
             if (response.status === 200) {
                 response.json().then((data) => {
-                    let possibleMoves = JSON.parse(data).moves;
+                    let possibleMoves = data.moves;
                     for (let i = 0; i < possibleMoves.length; i++) {
                         const toX = 7 - possibleMoves[i].to_x;
                         const toY = 7 - possibleMoves[i].to_y;
@@ -144,7 +140,6 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
 }
 
 function makeMove(x, y, toX, toY) {
-    // Path: /api/move-piece, moves a piece
     let queries = [
         //we have to flip the board for the internal board
         ["from_x", 7-x],
@@ -152,7 +147,7 @@ function makeMove(x, y, toX, toY) {
         ["to_x", 7-toX],
         ["to_y", 7-toY],
     ]
-    fetch("/move-piece" + "?" + new URLSearchParams(queries), {
+    fetch("/api/move-piece" + "?" + new URLSearchParams(queries), {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -226,8 +221,6 @@ function unfreezeBoard() {
 
 function makeEngineMove() {
     freezeBoard();
-    // Path: /api/make-engine-move, returns a json with the possible moves for the piece
-    // ex. { "possible_moves": [x1, y1, x2, y2]
     fetch("/api/make-engine-move", {
         method: "GET",
         headers: {
@@ -237,8 +230,7 @@ function makeEngineMove() {
 
     }).then((response) => {
         if (response.status === 200) {
-            response.json().then((response) => {
-                let json = JSON.parse(response);
+            response.json().then((json) => {
                 console.log(json)
                 const fromX = 7 - json.from_x;
                 const fromY = 7 - json.from_y;
@@ -285,8 +277,6 @@ function getCookie(name) {
 }
 
 async function getSession(sessionID) {
-    // Path: /api/get-session, returns a json with the color of the player
-    // ex. { "color": "white" }
     let data;
     await fetch("/api/get-session", {
         method: "GET",
@@ -299,7 +289,7 @@ async function getSession(sessionID) {
         if (response.status === 200) {
             await response.json().then((raw) => {
                 console.log(raw)
-                data = JSON.parse(raw);
+                data = raw;
             });
         } else {
             alert("Could not get color");

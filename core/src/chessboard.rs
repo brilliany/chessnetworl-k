@@ -11,6 +11,17 @@ lazy_static! {
 }
 
 
+/// Lightweight version of board state for the undo stack
+/// Avoids cloning the full `Chessboard` (and its history Vec) on every move
+#[derive(Clone, Debug)]
+pub struct BoardState {
+    pieces: [u64; 12],
+    white_pieces: u64,
+    black_pieces: u64,
+    castling_en_passant: u8,
+    zobrist_hash: u64,
+}
+
 #[derive(Default, Debug)]
 #[derive(Clone)]
 pub struct Chessboard {
@@ -46,8 +57,7 @@ pub struct Chessboard {
     castling_en_passant: u8,
     
     //history stack for undoing moves
-    //todo implement zobrist hashing and store hashes instead of full board states
-    history: Vec<Chessboard>,
+    history: Vec<BoardState>,
 
     zobrist_hash: u64,
 }
@@ -82,7 +92,7 @@ impl Chessboard {
     pub fn set_castling_en_passant(&mut self, castling_en_passant: u8) {
         self.castling_en_passant = castling_en_passant;
     }
-    pub fn get_history(&self) -> &Vec<Chessboard> {
+    pub fn get_history(&self) -> &Vec<BoardState> {
         &self.history
     }
     pub fn get_hash(&self) -> u64 {
@@ -147,11 +157,14 @@ impl Chessboard {
     /// Make a move and add the current state of the board to the history stack
     pub fn make_move(&mut self, mv: Move) {
         let zobrist: &ZobristTable = &*ZOBRIST;
-        // Save current state to history (for undo)
-        let mut state_to_save = self.clone();
-        // Save only the board state, undo then clones the full history back in
-        state_to_save.history = Vec::new();
-        self.history.push(state_to_save);
+        // Save current state to history
+        self.history.push(BoardState {
+            pieces: self.pieces,
+            white_pieces: self.white_pieces,
+            black_pieces: self.black_pieces,
+            castling_en_passant: self.castling_en_passant,
+            zobrist_hash: self.zobrist_hash,
+        });
 
         let from = mv.get_from_mask();
         let to = mv.get_to_mask();
@@ -237,7 +250,7 @@ impl Chessboard {
        zobrist.toggle_piece(&mut self.zobrist_hash, piece, color, from_sq);
 
         //XOR out any piece on the destination
-        for p in 1..=6 {
+        for p in PAWN..=KING {
             if (self.get_piece_mask(p, WHITE) & to) != 0 {
                 zobrist. toggle_piece(&mut self.zobrist_hash, p, WHITE, to_sq);
                 self.set_piece_mask(p, WHITE, self.get_piece_mask(p, WHITE) & !to);
@@ -280,12 +293,14 @@ impl Chessboard {
        }
    }
 
-   /// Undo the last move by setting the current board state to the previous state
+   /// Undo the last move by restoring the previous board state
    pub fn undo_move(&mut self) {
-       if let Some(mut prev_state) = self.history.pop() {
-           // We need to move the current history (minus the popped state) back into the restored state
-           prev_state.history = std::mem::take(&mut self.history);
-           *self = prev_state;
+       if let Some(state) = self.history.pop() {
+           self.pieces = state.pieces;
+           self.white_pieces = state.white_pieces;
+           self.black_pieces = state.black_pieces;
+           self.castling_en_passant = state.castling_en_passant;
+           self.zobrist_hash = state.zobrist_hash;
        } else {
            panic!("Cannot undo move: history is empty");
        }
@@ -354,11 +369,8 @@ impl Chessboard {
 
    fn print_history(&self) {
        println!("Chessboard history \n -----------------");
-       let mut i = 0;
-       for entry in self.history.clone() {
-           println!("Entry {}: ", i);
-           entry.print_board();
-           i += 1;
+       for (i, entry) in self.history.iter().enumerate() {
+           println!("Entry {}: pieces={:?}, castling_ep={:#010b}", i, entry.pieces, entry.castling_en_passant);
        }
    }
 }

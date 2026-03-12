@@ -1,492 +1,363 @@
-use actix_web::{cookie, get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use chessnetwork_core::Chessboard;
-use chrono::Utc;
-use config::Config;
-use cookie::Cookie;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use crate::session::Session;
+use axum::{
+    extract::{Query, State},
+    response::{Html, IntoResponse, Response},
+    routing::{get, post},
+    Json, Router,
+};
+use axum_extra::extract::CookieJar;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use tower_http::{services::ServeDir, services::ServeFile, trace::TraceLayer};
+
 use chessnetwork_core::movegenerator::generate_moves;
-//todo, couldnt be arsed to do this properly
 use chessnetwork_core::*;
 
-use crate::get_config_value;
+use crate::session::Session;
+use crate::{get_config, get_config_value};
 
-const INVALID_MOVE_VAL: u8 = 8;
+// Shared application state
 
-lazy_static! {
-    static ref SESSIONS: Mutex<HashMap<String, Session>> = Mutex::new(HashMap::new());
+type Sessions = Arc<Mutex<HashMap<String, Session>>>;
+
+#[derive(Clone)]
+struct AppState {
+    sessions: Sessions,
 }
 
-pub(crate) async fn setup_single_http_server(config: Config) -> std::io::Result<()> {
+#[tokio::main]
+pub(crate) async fn main() {
+    let config = get_config();
     let addr = get_config_value(&config, "http_server_address");
     let port = get_config_value(&config, "http_server_port");
 
-    HttpServer::new(|| {
-        App::new()
-            .service(hello)
-            .service(styles)
-            .service(play_engine)
-            .service(chessboard_js)
-            .service(populate_board)
-            .service(possible_moves)
-            .service(move_piece)
-            .service(make_engine_move)
-            .service(get_session_object)
-            .service(engine_icon)
-            .service(default_icon)
-            //piece images
-            .service(get_white_pawn_png)
-            .service(get_white_knight_png)
-            .service(get_white_bishop_png)
-            .service(get_white_rook_png)
-            .service(get_white_queen_png)
-            .service(get_white_king_png)
-            .service(get_black_pawn_png)
-            .service(get_black_knight_png)
-            .service(get_black_bishop_png)
-            .service(get_black_rook_png)
-            .service(get_black_queen_png)
-            .service(get_black_king_png)
-
-            .route("/invalid-request", web::get().to(invalid_req))
-    })
-        .bind(format!("{}:{}", addr, port))?
-        .run()
-        .await
-}
-
-#[actix_web::main]
-pub(crate) async fn main(config: Config) -> std::io::Result<()> {
-    let mode = get_config_value(&config, "mode");
-    init_sessions();
-    match mode.as_str() {
-        "HttpServerContinuous" => {
-            setup_continuous_http_server();
-        }
-        "HttpServerSingle" => {
-            setup_single_http_server(config).await?;
-        }
-        _ => {
-            println!("Invalid mode");
-        }
-    }
-    Ok(())
-}
-
-
-
-pub(crate) fn setup_continuous_http_server() {
-    // implementation
-}
-
-#[get("/")]
-async fn hello() -> impl Responder {
-    //respond with the web/welcome.html file
-    let path = format!("web/welcome.html");
-    let file_contents = read_file(&path);
-    HttpResponse::Ok().content_type("text/html").body(file_contents)
-}
-
-#[get("/css/style.css")]
-async fn styles() -> impl Responder {
-    //respond with the web/css/style.css file
-    let path = format!("web/css/style.css");
-    let file_contents = read_file(&path);
-    HttpResponse::Ok().content_type("text/css").body(file_contents)
-}
-
-#[get("/play-engine")]
-async fn play_engine(req: HttpRequest) -> impl Responder {
-    return if let Some(session_cookie) = req.cookie("session_id") {
-        println!("Session cookie found: {}", session_cookie.value());
-        //respond with the web/play-engine.html file
-        let path = format!("web/play-engine.html");
-        let file_contents = read_file(&path);
-        HttpResponse::Ok().content_type("text/html").body(file_contents)
-    } else {
-        println!("No session cookie found");
-        //create new session
-        let session = create_new_session();
-        //respond with the web/play-engine.html file and set the session_id cookie
-        let path = format!("web/play-engine.html");
-        let file_contents = read_file(&path);
-        let mut response = HttpResponse::Ok().content_type("text/html").body(file_contents);
-        response.add_cookie(
-            &Cookie::build("session_id", session)
-                .path("/")
-                .secure(false)
-                .http_only(false)
-                .finish()
-        ).expect("Failed to set cookie");
-        response
-    }
-}
-
-//get js/ts files
-
-#[get("/js/chessboard.js")]
-async fn chessboard_js() -> impl Responder {
-    //respond with the web/js/chessboard.js file
-    let path = format!("web/js/chessboard.js");
-    let file_contents = read_file(&path);
-    HttpResponse::Ok().content_type("text/javascript").body(file_contents)
-}
-
-//api operations
-#[get("/api/populate-board")]
-async fn populate_board(req: HttpRequest) -> impl Responder {
-    //get session_id from cookie
-    let session = check_session(&req);
-    //return board state
-    let mut board = session.clone().board;
-    println!("Currently there are {} sessions", get_session_count());
-    println!("Sending board state: for session: {}", session.id);
-    board.print_board();
-    let json = board.convert_to_json();
-    HttpResponse::Ok().json(json)
-}
-
-fn read_file(path: &String) -> String {
-    let file_contents = match std::fs::read_to_string(&path) {
-        Ok(contents) => contents,
-        Err(err) => {
-            println!("Error reading file: {}", err);
-            String::from("Error reading file")
-        }
+    let state = AppState {
+        sessions: Arc::new(Mutex::new(HashMap::new())),
     };
-    file_contents
-}
-//all piece images
-#[get("/pieces/white_pawn.png")]
-async fn get_white_pawn_png() -> impl Responder {
-    //respond with the web/pieces/white_pawn.png file
-    let path = format!("web/pieces/white_pawn.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/white_knight.png")]
-async fn get_white_knight_png() -> impl Responder {
-    //respond with the web/pieces/white_knight.png file
-    let path = format!("web/pieces/white_knight.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/white_bishop.png")]
-async fn get_white_bishop_png() -> impl Responder {
-    //respond with the web/pieces/white_bishop.png file
-    let path = format!("web/pieces/white_bishop.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/white_rook.png")]
-async fn get_white_rook_png() -> impl Responder {
-    //respond with the web/pieces/white_rook.png file
-    let path = format!("web/pieces/white_rook.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/white_queen.png")]
-async fn get_white_queen_png() -> impl Responder {
-    let path = format!("web/pieces/white_queen.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/white_king.png")]
-async fn get_white_king_png() -> impl Responder {
-    let path = format!("web/pieces/white_king.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_pawn.png")]
-async fn get_black_pawn_png() -> impl Responder {
-    //respond with the web/pieces/black_pawn.png file
-    let path = format!("web/pieces/black_pawn.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_knight.png")]
-async fn get_black_knight_png() -> impl Responder {
-    //respond with the web/pieces/black_knight.png file
-    let path = format!("web/pieces/black_knight.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_bishop.png")]
-async fn get_black_bishop_png() -> impl Responder {
-    //respond with the web/pieces/black_bishop.png file
-    let path = format!("web/pieces/black_bishop.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_rook.png")]
-async fn get_black_rook_png() -> impl Responder {
-    //respond with the web/pieces/black_rook.png file
-    let path = format!("web/pieces/black_rook.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_queen.png")]
-async fn get_black_queen_png() -> impl Responder {
-    let path = format!("web/pieces/black_queen.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
-}
-#[get("/pieces/black_king.png")]
-async fn get_black_king_png() -> impl Responder {
-    let path = format!("web/pieces/black_king.png");
-    let file_contents = get_image(&path);
-    HttpResponse::Ok().content_type("image/png").body(file_contents)
+
+    let app = api_routes(state)
+        .merge(page_routes())
+        .merge(serve_dirs())
+        .layer(TraceLayer::new_for_http());
+
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", addr, port))
+        .await
+        .unwrap();
+
+    println!("Listening on {}:{}", addr, port);
+    axum::serve(listener, app).await.unwrap();
 }
 
-#[get("/api/possible-moves")]
-async fn possible_moves(req: HttpRequest) -> impl Responder {
-    let session = check_session(&req);
+// Static-file serving
+fn serve_dirs() -> Router {
+    const STATIC_DIRS: &[(&str, &str)] = &[
+        ("/css", "static/css"),
+        ("/js", "static/js"),
+        ("/icons", "static/icons"),
+        ("/pieces", "static/pieces"),
+    ];
 
-    let queries = req.query_string();
-    let queries = queries.split("&");
-    let mut x = INVALID_MOVE_VAL;
-    let mut y = INVALID_MOVE_VAL;
-    let mut color = INVALID_MOVE_VAL as i8;
-    for query in queries {
-        let query = query.split("=");
-        let mut query = query.into_iter();
-        let key = query.next().unwrap();
-        let value = query.next().unwrap();
-        match key {
-            "x" => {
-                x = value.parse::<u8>().unwrap();
-            }
-            "y" => {
-                y = value.parse::<u8>().unwrap();
-            }
-            "color" => {
-                color = value.parse::<i8>().unwrap();
-            }
-            _ => {
-                println!("Invalid query key: {}", key);
-                return invalid_req().await;
-            }
-        }
+    let fallback = ServeFile::new("static/invalid_request.html");
+    let mut router = Router::new();
+    for (route, path) in STATIC_DIRS {
+        router = router.nest_service(route, ServeDir::new(path).not_found_service(fallback.clone()));
+    }
+    router.fallback_service(fallback)
+}
+
+// webpages
+fn page_routes() -> Router {
+    Router::new()
+        .route("/", get(welcome))
+        .route("/play-engine", get(play_engine))
+}
+
+async fn welcome() -> Html<String> {
+    Html(read_static_file("static/welcome.html"))
+}
+
+async fn play_engine(jar: CookieJar) -> Response {
+    let body = read_static_file("static/play-engine.html");
+
+    if jar.get("session_id").is_some() {
+        return Html(body).into_response();
     }
 
-    let chessboard = &session.board;
-    let moves = generate_moves(chessboard, color);
-    chessboard.print_board();
-    // Filter moves that match the correct coordinates
-    let moves: Vec<Move> = moves.into_iter().filter(|mv| {
-        mv.get_from_x() == x && mv.get_from_y() == y
-    }).collect();
+    // No session cookie yet – create one and set it.
+    let session_id = format!("{}", Utc::now().timestamp());
+    let cookie = format!("session_id={}; Path=/; HttpOnly=false", session_id);
 
-    let moves_str: Vec<String> = moves.iter().map(|mv| {
-        format!(
-            "{{\"from_x\":{},\"from_y\":{},\"to_x\":{},\"to_y\":{}}}",
-            mv.get_from_x(),
-            mv.get_from_y(),
-            mv.get_to_x(),
-            mv.get_to_y()
-        )
-    }).collect();
+    (
+        [("set-cookie", cookie)],
+        Html(body),
+    )
+        .into_response()
+}
 
-    HttpResponse::Ok().json(format!("{{\"moves\": [{}]}}", moves_str.join(",")))
+fn read_static_file(path: &str) -> String {
+    std::fs::read_to_string(path).unwrap_or_else(|e| {
+        eprintln!("Error reading {path}: {e}");
+        "Error reading file".into()
+    })
+}
+
+// API routes
+fn api_routes(state: AppState) -> Router {
+    Router::new()
+        .route("/api/get-session", get(get_session_object))
+        .route("/api/populate-board", get(populate_board))
+        .route("/api/possible-moves", get(possible_moves))
+        .route("/api/make-engine-move", get(make_engine_move))
+        .route("/api/move-piece", post(move_piece))
+        .with_state(state)
 }
 
 
-#[get("/other/engine-icon.png")]
-async fn engine_icon() -> impl Responder {
-    let path = format!("web/other/engine-icon.png");
-    let image = get_image(&path);
-    HttpResponse::Ok()
-        .content_type("image/png")
-        .body(image)
-}
-#[get("/other/default-icon.png")]
-async fn default_icon() -> impl Responder {
-    let path = format!("web/other/default-icon.png");
-    let image = get_image(&path);
-    HttpResponse::Ok()
-        .content_type("image/png")
-        .body(image)
+// response types
+#[derive(Deserialize)]
+struct PossibleMovesQuery {
+    x: u8,
+    y: u8,
+    color: i8,
 }
 
-#[post("/move-piece")]
-async fn move_piece(req: HttpRequest) -> impl Responder {
-    //    let queries = [
-    //         ["from_x", x],
-    //         ["from_y", y],
-    //         ["to_x", toX],
-    //         ["to_y", toY],
-    //         ["piece", square],
-    //     ]
-    let session = check_session(&req);
-
-    let queries = req.query_string();
-    let queries = queries.split("&");
-    let mut from_x= INVALID_MOVE_VAL;
-    let mut from_y= INVALID_MOVE_VAL;
-    let mut to_x= INVALID_MOVE_VAL;
-    let mut to_y= INVALID_MOVE_VAL;
-
-    for query in queries {
-        let query = query.split("=");
-        let mut query = query.into_iter();
-        let key = query.next().unwrap();
-        let value = query.next().unwrap();
-        match key {
-            "from_x" => {
-                from_x = value.parse::<u8>().unwrap();
-            }
-            "from_y" => {
-                from_y = value.parse::<u8>().unwrap();
-            }
-            "to_x" => {
-                to_x = value.parse::<u8>().unwrap();
-            }
-            "to_y" => {
-                to_y = value.parse::<u8>().unwrap();
-            }
-            _ => {
-                println!("Invalid key");
-            }
-        }
-    }
-    let chessboard = session.get_board_state();
-    session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
-
-    println!("Currently there are {} sessions", get_session_count());
-    println!("Session: {} board now looks like this:", session.get_id());
-    chessboard.print_board();
-
-    HttpResponse::Ok()
+#[derive(Deserialize)]
+struct MovePieceQuery {
+    from_x: u8,
+    from_y: u8,
+    to_x: u8,
+    to_y: u8,
 }
 
-#[get("/api/make-engine-move")]
-async fn make_engine_move(req: HttpRequest) -> impl Responder {
-    let session = check_session(&req);
-    let mut board = session.get_board_state();
-    println!("Engine making move for session: {}", session.get_id());
+#[derive(Serialize)]
+struct MoveJson {
+    from_x: u8,
+    from_y: u8,
+    to_x: u8,
+    to_y: u8,
+}
+
+#[derive(Serialize)]
+struct PossibleMovesResponse {
+    moves: Vec<MoveJson>,
+}
+
+#[derive(Serialize)]
+struct SessionResponse {
+    board: serde_json::Value,
+    turn: i8,
+    opponent: i8,
+    user: i8,
+    session_id: String,
+}
+
+// Handlers
+async fn get_session_object(
+    jar: CookieJar,
+    State(state): State<AppState>,
+) -> Json<SessionResponse> {
+    let session = get_or_create_session(&jar, &state.sessions);
+
+    let board_json: serde_json::Value =
+        serde_json::from_str(&session.board.clone().convert_to_json())
+            .expect("board json parse error");
+
+    let user_color = session.get_user_color();
+    let opponent = if user_color == WHITE { BLACK } else { WHITE };
+
+    Json(SessionResponse {
+        board: board_json,
+        turn: session.get_turn(),
+        opponent,
+        user: user_color,
+        session_id: session.get_id(),
+    })
+}
+
+async fn populate_board(
+    jar: CookieJar,
+    State(state): State<AppState>,
+) -> Json<serde_json::Value> {
+    let session = get_or_create_session(&jar, &state.sessions);
+    let mut board = session.board.clone();
+
+    let session_count = state.sessions.lock()
+        .map(|s| s.len())
+        .unwrap_or(0);
+
+    println!(
+        "Sessions: {} | Sending board for session {}",
+        session_count,
+        session.id
+    );
     board.print_board();
-    //for now just make a new_single engine and ask for a move
+
+    let json: serde_json::Value =
+        serde_json::from_str(&board.convert_to_json()).expect("board json parse error");
+    Json(json)
+}
+
+async fn possible_moves(
+    jar: CookieJar,
+    State(state): State<AppState>,
+    Query(params): Query<PossibleMovesQuery>,
+) -> Json<PossibleMovesResponse> {
+    let x = params.x;
+    let y = params.y;
+    let color = params.color;
+
+    let mut session = get_or_create_session(&jar, &state.sessions);
+    let chessboard = &mut session.board;
+    chessboard.print_board();
+
+    let moves: Vec<MoveJson> = generate_moves(chessboard, color)
+        .into_iter()
+        .filter(|mv| mv.get_from_x() == x && mv.get_from_y() == y)
+        .map(|mv| MoveJson {
+            from_x: mv.get_from_x(),
+            from_y: mv.get_from_y(),
+            to_x: mv.get_to_x(),
+            to_y: mv.get_to_y(),
+        })
+        .collect();
+
+    Json(PossibleMovesResponse { moves })
+}
+
+async fn move_piece(
+    jar: CookieJar,
+    State(state): State<AppState>,
+    Query(params): Query<MovePieceQuery>,
+) -> impl IntoResponse {
+    let from_x = params.from_x;
+    let from_y = params.from_y;
+    let to_x = params.to_x;
+    let to_y = params.to_y;
+
+    let session_id = get_session_id(&jar);
+
+    //lock session during move
+    {
+        let mut sessions = match state.sessions.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                eprintln!("Thread panicked while moving piece in session {}, recovering...", session_id);
+                poisoned.into_inner()
+            }
+        };
+
+        let count = sessions.len();
+        let session = sessions
+            .get_mut(&session_id)
+            .expect("session not found");
+
+        session.make_move(Move::new_from_coordinates(
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+        ));
+
+        println!(
+            "Sessions: {} | Session {} board:",
+            count,
+            session.id
+        );
+        session.board.print_board();
+    };
+
+    axum::http::StatusCode::OK
+}
+
+async fn make_engine_move(
+    jar: CookieJar,
+    State(state): State<AppState>,
+) -> Json<MoveJson> {
+    let session_id = get_session_id(&jar);
+
+    // lock session to get board
+    let mut board = {
+        let sessions = match state.sessions.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                eprintln!("Thread panicked while making engine move for session {}, recovering...", session_id);
+                poisoned.into_inner()
+            }
+        };
+
+        let session = sessions
+            .get(&session_id)
+            .expect("session not found");
+
+        println!("Engine making move for session {}", session.id);
+        session.board.clone()
+    };
+
+    // run engine without lock to not block requests
+    board.print_board();
     let mut engine = Engine::new_single(60, BLACK);
     let engine_move = engine.get_best_move(&mut board).unwrap();
-    let from_x = engine_move.get_from_x();
-    let from_y = engine_move.get_from_y();
-    let to_x = engine_move.get_to_x();
-    let to_y = engine_move.get_to_y();
-    session.make_move(Move::new_from_coordinates(from_x, from_y, to_x, to_y));
-    let move_obj = String::new()
-        + "{\"from_x\":" + &from_x.to_string()
-        + ",\"from_y\":" + &from_y.to_string()
-        + ",\"to_x\":" + &to_x.to_string()
-        +  ",\"to_y\":" + &to_y.to_string()
-        +  "}";
-    HttpResponse::Ok().json(move_obj)
-}
-#[get("/api/get-session")]
-async fn get_session_object(req: HttpRequest) -> impl Responder {
-    let session = check_session(&req);
-    let board = session.get_board_state().convert_to_json();
-    let turn = session.get_turn();
-    let user_color = session.get_user_color();
-    let opponent = if user_color == WHITE {
-        BLACK
-    } else {
-        WHITE
+
+    let result = MoveJson {
+        from_x: engine_move.get_from_x(),
+        from_y: engine_move.get_from_y(),
+        to_x: engine_move.get_to_x(),
+        to_y: engine_move.get_to_y(),
     };
-    let session_id = session.get_id();
 
-    let session_object = String::new()
-        + "{\"board\":" + &board
-        + ",\"turn\":" + &turn.to_string()
-        + ",\"opponent\":\"" + &opponent.to_string()
-        +  "\",\"user\":\"" + &user_color.to_string()
-        + "\",\"session_id\":\"" + &session_id + "\"}";
-    HttpResponse::Ok().json(session_object)
+    // lock session again to move
+    {
+        let mut sessions = match state.sessions.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                eprintln!("Thread panicked while applying engine move for session {}, recovering...", session_id);
+                poisoned.into_inner()
+            }
+        };
+
+        let session = sessions
+            .get_mut(&session_id)
+            .expect("session not found");
+
+        session.make_move(Move::new_from_coordinates(
+            result.from_x,
+            result.from_y,
+            result.to_x,
+            result.to_y,
+        ));
+    }
+
+    Json(result)
 }
 
+// Session helpers
+/// Read the session id from the cookie jar, or return "0" if not found
+fn get_session_id(jar: &CookieJar) -> String {
+    jar.get("session_id")
+        .map(|c| c.value().to_owned())
+        .unwrap_or_else(|| "0".into())
+}
 
-fn get_image(path: &String) -> Vec<u8> {
-    let file_contents = match std::fs::read(&path) {
-        Ok(contents) => contents,
-        Err(err) => {
-            println!("Error reading file: {}", err);
-            Vec::new()
+/// Return clone of the session
+/// Creates a new session if none exists for the cookie.
+fn get_or_create_session(jar: &CookieJar, sessions: &Sessions) -> Session {
+    let id = get_session_id(jar);
+    let mut map = match sessions.lock() {
+        Ok(m) => m,
+        Err(poisoned) => {
+            eprintln!("Thread panicked while accessing sessions for session {}, recovering...", id);
+            poisoned.into_inner()
         }
     };
-    file_contents
-}
 
-async fn invalid_req() -> HttpResponse {
-   //send invalid_request.html
-    let path = format!("web/invalid_request.html");
-    let file_contents = read_file(&path);
-    HttpResponse::BadRequest().content_type("text/html").body(file_contents)
-}
-
-
-
-static mut GLOBAL_SESSIONS: Option<HashMap<String, Session>> = None;
-
-fn create_new_session() -> String {
-    let session_id = format!("{}", Utc::now().timestamp());
-    let mut board = Chessboard::default();
-    board.init();
-    let session = Session::new(session_id.clone(), board, 1, WHITE, BLACK);
-
-    unsafe {
-        GLOBAL_SESSIONS
-            .as_mut()
-            .unwrap()
-            .insert(session_id.clone(), session);
+    if !map.contains_key(&id) {
+        let mut board = Chessboard::default();
+        board.init();
+        let session = Session::new(id.clone(), board, 1, WHITE, BLACK);
+        map.insert(id.clone(), session);
     }
-    session_id
-}
 
-fn check_session(req: &HttpRequest) -> &mut Session {
-    let cookie = req.cookie("session_id").expect("No session cookie found");
-    let session_id = cookie.value().to_owned();
-    //get session from session_id
-    let session = get_session(&session_id[..]).unwrap_or_else(
-        || {
-            println!("Session not found");
-            let new_session_id = create_new_session();
-            get_session(&new_session_id[..]).unwrap()
-        });
-    session
-}
-
-fn get_session(session_id: &str) -> Option<&'static mut Session> {
-    unsafe {
-        GLOBAL_SESSIONS
-            .as_mut()
-            .unwrap()
-            .get_mut(session_id)
-    }
-}
-
-fn get_all_sessions() -> Vec<&'static mut Session> {
-    unsafe {
-        GLOBAL_SESSIONS
-            .as_mut()
-            .unwrap()
-            .values_mut()
-            .collect()
-    }
-}
-
-fn get_session_count() -> usize {
-    unsafe {
-        GLOBAL_SESSIONS
-            .as_mut()
-            .unwrap()
-            .len()
-    }
-}
-// This function initializes the global variable with an empty hashmap.
-fn init_sessions() {
-    unsafe {
-        GLOBAL_SESSIONS = Some(HashMap::new());
-    }
+    map.get(&id).unwrap().clone()
 }
