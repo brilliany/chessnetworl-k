@@ -2,21 +2,22 @@ use crate::chessboard::Chessboard;
 use crate::r#move::Move;
 use crate::{BISHOP, BLACK, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE};
 
-pub fn generate_moves(chessboard: &Chessboard, color: i8) -> Vec<Move> {
+pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
     let mut moves = Vec::new();
 
-    get_pawn_moves(&chessboard, color, &mut moves);
-    get_knight_moves(&chessboard, color, &mut moves);
-    get_bishop_moves(&chessboard, color, &mut moves, None);
-    get_rook_moves(&chessboard, color, &mut moves, None);
-    get_queen_moves(&chessboard, color, &mut moves);
-    get_king_moves(&chessboard, color, &mut moves);
+    get_pawn_moves(chessboard, color, &mut moves);
+    get_knight_moves(chessboard, color, &mut moves);
+    get_bishop_moves(chessboard, color, &mut moves, None);
+    get_rook_moves(chessboard, color, &mut moves, None);
+    get_queen_moves(chessboard, color, &mut moves);
+    get_king_moves(chessboard, color, &mut moves);
 
     moves.retain(|mv| {
-        let mut dummy_board = chessboard.clone();
-        dummy_board.make_move(*mv);
-        let king_mask = dummy_board.get_piece_mask(KING, color);
-        !is_square_attacked(&dummy_board, king_mask, -color)
+        chessboard.make_move(*mv);
+        let king_mask = chessboard.get_piece_mask(KING, color);
+        let legal = !is_square_attacked(chessboard, king_mask, -color);
+        chessboard.undo_move();
+        legal
     });
 
     moves
@@ -328,7 +329,7 @@ pub fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>
 }
 
 
-pub fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
+pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Move>) {
     let mut king_mask = chessboard.get_piece_mask(KING, color);
 
     let own_pieces = if color == WHITE { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
@@ -356,14 +357,14 @@ pub fn get_king_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
 
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-            let mut dummy_chessboard = chessboard.clone();
 
-            //this is stupid but we need to do it if we dont want to recreate pawn move generation manually here
-            dummy_chessboard.make_move(Move::new(from,to));
+            chessboard.make_move(Move::new(from, to));
 
-            if !is_square_attacked(&dummy_chessboard, to, -color) {
+            if !is_square_attacked(chessboard, to, -color) {
                 moves.push(Move::new(from, to));
             }
+
+            chessboard.undo_move();
 
             move_mask &= move_mask - 1;
         }

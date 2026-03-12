@@ -1,14 +1,10 @@
-use config::{Config, File, FileFormat};
+use config::{Config, File};
 
-mod server;
 mod session;
+mod server;
 
 fn main() {
-    let config = get_config();
-
-    if let Err(e) = server::main(config) {
-        eprintln!("Server error: {}", e);
-    }
+    server::main();
 }
 
 fn get_config() -> Config {
@@ -20,6 +16,6 @@ fn get_config() -> Config {
 }
 
 fn get_config_value(config: &Config, key: &str) -> String {
-    let mode = config.get::<String>(key).unwrap();
-    mode
+    let val = config.get::<String>(key).unwrap();
+    val
 }
