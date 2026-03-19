@@ -1,6 +1,6 @@
 use crate::chessboard::Chessboard;
 use crate::r#move::Move;
-use crate::{BISHOP, BLACK, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE};
+use crate::{BISHOP, BLACK, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, STARTING_POS, WHITE, WHITE_KINGSIDE_CASTLE};
 
 pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
     let mut moves = Vec::new();
@@ -43,14 +43,10 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         //store mask for pawns that can move two steps on rank 6 (from white perspective)
         let mut two_step_pawns = ((move_mask & RANKS[2]) << 8) &! (pieces | opponent_pieces);
 
-        //masks for capturing moves
-        let en_passant_mask = 1u64 << ((chessboard.get_castling_en_passant() & 0b0000_1111) + 32);
-        let mut right_capture_mask = ((pawns &! FILES[0]) << 7) & opponent_pieces
-            //pawns which have their capture square on the current en passant square
-            | ((pawns &! FILES[0]) << 7) & en_passant_mask;
-        let mut left_capture_mask = (pawns &! FILES[7]) << 9 & opponent_pieces
-            | ((pawns &! FILES[7]) << 9) & en_passant_mask;
-        
+        //masks for capturing moves (normal captures only)
+        let mut right_capture_mask = ((pawns &! FILES[0]) << 7) & opponent_pieces;
+        let mut left_capture_mask = (pawns &! FILES[7]) << 9 & opponent_pieces;
+
         while move_mask != 0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
             let from_square = to_square >> 8;
@@ -77,6 +73,29 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             moves.push(Move::new(from_square, to_square));
             right_capture_mask &= right_capture_mask -1;
         }
+
+        // En passant captures
+        // ep_index is a file number 1–8, 0 is none
+        // White always captures onto rank 5 (bits 32–39); the captured black pawn is on rank 4.
+        let ep_index = chessboard.get_en_passant();
+        if ep_index != 0 {
+            let ep_target = 1u64 << ((ep_index - 1) as u32 + 32); // destination square on rank 5
+            let captured_square = ep_target >> 8;                  // black pawn on rank 4
+
+            // Pawn to the right of the ep file (shifted << 7 reaches ep_target)
+            let right_ep = (pawns & !FILES[0]) << 7;
+            if right_ep & ep_target != 0 {
+                let from_square = ep_target >> 7;
+                moves.push(Move::en_passant(from_square, ep_target, captured_square));
+            }
+
+            // Pawn to the left of the ep file
+            let left_ep = (pawns & !FILES[7]) << 9;
+            if left_ep & ep_target != 0 {
+                let from_square = ep_target >> 9;
+                moves.push(Move::en_passant(from_square, ep_target, captured_square));
+            }
+        }
     } else {
         let pieces = chessboard.get_black_pieces();
         let opponent_pieces = chessboard.get_white_pieces();
@@ -93,13 +112,9 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         //store mask for pawns that can move two steps on rank 1 (from black perspective)
         let mut two_step_pawns = ((move_mask & RANKS[5]) >> 8) &! ((pieces | opponent_pieces));
 
-        //masks for capturing moves
-        let en_passant_mask = 1u64 << ((chessboard.get_castling_en_passant() & 0b0000_1111) + 16);
-
-        let mut right_capture_mask = ((pawns &! FILES[0]) >> 9) & opponent_pieces
-        | ((pawns &! FILES[0]) >> 9) & en_passant_mask;
-        let mut left_capture_mask = (pawns &! FILES[7]) >> 7 & opponent_pieces
-            | ((pawns &! FILES[7]) >> 7) & en_passant_mask;
+        //masks for capturing moves (normal captures only)
+        let mut right_capture_mask = ((pawns &! FILES[0]) >> 9) & opponent_pieces;
+        let mut left_capture_mask = (pawns &! FILES[7]) >> 7 & opponent_pieces;
 
         while move_mask !=0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
@@ -127,21 +142,25 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             moves.push(Move::new(from_square, to_square));
             right_capture_mask &= right_capture_mask -1;
         }
-    };
-    
-    //todo en passant
-        //en passant
-        /*if let Some(last_move) = chessboard.get_history().last() {
-            let black_pieces_prev = last_move.get_black_pieces();
-            if y == if color == 1 { 4 } else { 3 } && (black_pieces_prev & two_step) != 0 {
-                if x != 0 && (opponent_pieces & (1 << (x - 1 + (y + direction) * 8))) != 0 {
-                    moves.push(Move::new(x as u8, y as u8, (x - 1) as u8, (y + direction) as u8));
-                }
-                if x != 7 && (opponent_pieces & (1 << (x + 1 + (y + direction) * 8))) != 0 {
-                    moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
-                }
+        
+        let ep_index = chessboard.get_en_passant();
+        if ep_index != 0 {
+            let ep_target = 1u64 << ((ep_index - 1) as u32 + 16); 
+            let captured_square = ep_target << 8;                 
+            
+            let right_ep = (pawns & !FILES[0]) >> 9;
+            if right_ep & ep_target != 0 {
+                let from_square = ep_target << 9;
+                moves.push(Move::en_passant(from_square, ep_target, captured_square));
             }
-        }*/
+            
+            let left_ep = (pawns & !FILES[7]) >> 7;
+            if left_ep & ep_target != 0 {
+                let from_square = ep_target << 7;
+                moves.push(Move::en_passant(from_square, ep_target, captured_square));
+            }
+        }
+    };
 }
 
 pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){
@@ -369,6 +388,13 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
             move_mask &= move_mask - 1;
         }
         king_mask &= king_mask - 1;
+        
+        // castling
+        /*if chessboard.get_castling_rights() & WHITE_KINGSIDE_CASTLE != 0 {
+            //assume rook on starting square
+            let rook_mask = STARTING_POS[ROOK][WHITE];
+            let empty_squares = (FILES[5] | FILES[6]) & RANKS[0];
+        }*/
     }
 }
 

@@ -64,6 +64,12 @@ macro_rules! define_consts {
             (KING, BLACK, (1u64 << 59)),
             (KING, WHITE, (1u64 << 3)),
         ];
+
+        //castling
+        pub const WHITE_KINGSIDE_CASTLE: u8 = 0b0001;
+        pub const WHITE_QUEENSIDE_CASTLE: u8 = 0b0010;
+        pub const BLACK_KINGSIDE_CASTLE: u8 = 0b0100;
+        pub const BLACK_QUEENSIDE_CASTLE: u8 = 0b1000;
     };
 }
 
