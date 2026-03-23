@@ -3,9 +3,10 @@ const sessionId = getCookie("session_id");
 let color = 0;
 let savedPossibleMoves = []
 let pieces = [] // keeps track of the pieces on the board, the 'element' property might not correspond to the actual element on the board
+let isSubmittingMove = false;
 
 
-await initialRequest(sessionId);
+initialRequest(sessionId);
 async function initialRequest(sessionId) {
     let data = await getSession(sessionId);
     color = -data.opponent;
@@ -120,12 +121,14 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
                         const toSquare = document.getElementById("row" + toY).children[toX];
                         console.log("Possible move added")
                         toSquare.classList.add("possible-move");
+                        const specialMove = possibleMoves[i].special_move;
                         let possibleMoveListener = function () {
-                            makeMove(x, y, toX, toY, piece_name);
+                            makeMove(x, y, toX, toY, specialMove);
                         };
                         toSquare.addEventListener("click", possibleMoveListener, {once: true});
                         savedPossibleMoves.push({
                             location: [toX, toY],
+                            specialMove: specialMove,
                             listenerFunction: possibleMoveListener,
                         });
                     }
@@ -139,7 +142,12 @@ function addListenerToPiece(pieceImg, piece_name, x, y) {
     return listenerFunction;
 }
 
-function makeMove(x, y, toX, toY) {
+function makeMove(x, y, toX, toY, specialMove) {
+    if (isSubmittingMove) {
+        return;
+    }
+    isSubmittingMove = true;
+
     let queries = [
         //we have to flip the board for the internal board
         ["from_x", 7-x],
@@ -147,6 +155,9 @@ function makeMove(x, y, toX, toY) {
         ["to_x", 7-toX],
         ["to_y", 7-toY],
     ]
+    if (specialMove) {
+        queries.push(["special_move", specialMove]);
+    }
     fetch("/api/move-piece" + "?" + new URLSearchParams(queries), {
         method: "POST",
         headers: {
@@ -156,14 +167,18 @@ function makeMove(x, y, toX, toY) {
 
     }).then((response) => {
         if (response.status === 200) {
-            movePiece(x, y, toX, toY);
+            movePiece(x, y, toX, toY, specialMove);
             makeEngineMove();
         } else {
+            isSubmittingMove = false;
             alert("Could not move piece");
         }
+    }).catch(() => {
+        isSubmittingMove = false;
+        alert("Could not move piece");
     });
 }
-function movePiece(x, y, toX, toY) {
+function movePiece(x, y, toX, toY, specialMove = "normal") {
  //moves a specific piece from one square to another in the html
     const fromSquare = document.getElementById("row" + y).children[x];
     const toSquare = document.getElementById("row" + toY).children[toX];
@@ -176,7 +191,9 @@ function movePiece(x, y, toX, toY) {
     }
     let pieceElement = first.children[0];
     //if piece on toSquare, remove it
-    if (toSquare.children[0].children.length > 0) {
+    if (specialMove === "en_passant") {
+        document.getElementById("row" + (toY + color)).children[toX].children[0].children[0].remove()
+    } else if (toSquare.children[0].children.length > 0) {
         toSquare.children[0].children[0].remove();
     } else if (pawn && toX !== x) {
         document.getElementById("row" + (toY + color)).children[toX].children[0].children[0].remove()
@@ -185,6 +202,22 @@ function movePiece(x, y, toX, toY) {
     first.innerHTML = "";
     //add piece to toSquare
     toSquare.children[0].appendChild(pieceElement);
+
+    if (specialMove === "castling") {
+        const rookFromX = toX > x ? 7 : 0;
+        const rookToX = toX > x ? toX - 1 : toX + 1;
+        const rookFromSquare = document.getElementById("row" + y).children[rookFromX];
+        const rookToSquare = document.getElementById("row" + y).children[rookToX];
+        if (rookFromSquare.children[0].children.length > 0) {
+            const rookElement = rookFromSquare.children[0].children[0];
+            rookFromSquare.children[0].innerHTML = "";
+            if (rookToSquare.children[0].children.length > 0) {
+                rookToSquare.children[0].children[0].remove();
+            }
+            rookToSquare.children[0].appendChild(rookElement);
+        }
+    }
+
     //add event listener to piece if it's the player's color
     const pieceColor = pieceElement.getAttribute("alt").startsWith("white") ? 1 : -1;
     if (pieceColor === color) {
@@ -236,13 +269,18 @@ function makeEngineMove() {
                 const fromY = 7 - json.from_y;
                 const toX = 7 - json.to_x;
                 const toY = 7 - json.to_y;
-                movePiece(fromX, fromY, toX, toY);
+                movePiece(fromX, fromY, toX, toY, json.special_move || "normal");
                 unfreezeBoard();
+                isSubmittingMove = false;
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);
             });
         } else {
+            isSubmittingMove = false;
             alert("Could not make engine move");
         }
+    }).catch(() => {
+        isSubmittingMove = false;
+        alert("Could not make engine move");
     });
 }
 function removePossibleMoves() {

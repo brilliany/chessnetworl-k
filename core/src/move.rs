@@ -51,6 +51,14 @@ impl Move {
         self.kind
     }
 
+    pub fn is_en_passant(&self) -> bool {
+        matches!(self.kind, MoveType::EnPassant { .. })
+    }
+
+    pub fn is_castling(&self) -> bool {
+        matches!(self.kind, MoveType::Castling { .. })
+    }
+
     pub fn get_from_mask(&self) -> u64 {
         self.from_mask
     }

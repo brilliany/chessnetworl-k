@@ -42,8 +42,8 @@ pub struct Chessboard {
     /// En passant target file, stored as a 1-based index [1–8], or 0 for none.
     /// The same encoding is used regardless of which color just double-pushed.
     /// The move generator derives the correct rank from context:
-    ///   - White captures onto rank 5: bit = (file - 1) + 32
-    ///   - Black captures onto rank 2: bit = (file - 1) + 16
+    ///   - White captures, moving to rank 5, capturing pawn on rank 4: bit index = (file-1) + 4*8
+    ///   - Black captures, moving to rank 2, capturing pawn on rank 3: bit index = (file-1) + 3*8
     en_passant: u8,
 
     //history stack for undoing moves
@@ -178,9 +178,7 @@ impl Chessboard {
 
         // Update castling rights
         self.update_castling_rights(from, to, zobrist);
-
         self.assign_en_passant(from, to, piece_type, color, zobrist);
-
 
        self.move_piece(piece_type, color, &mv, zobrist);
 
@@ -270,7 +268,6 @@ impl Chessboard {
        match mv.mv_type() {
            MoveType::Normal => {}
            MoveType::EnPassant { captured_square } => {
-               // Remove the captured pawn (which is NOT on the destination square)
                self.clear_square(captured_square, zobrist);
            }
            MoveType::Castling { rook_from, rook_to } => {
@@ -284,7 +281,7 @@ impl Chessboard {
                self.pieces[rook_idx] |= rook_to;
                zobrist.toggle_piece(&mut self.zobrist_hash, ROOK, color, rook_to_sq);
 
-               // Update color occupancy for the rook
+               // Update color bitboard
                if color == WHITE {
                    self.white_pieces &= !rook_from;
                    self.white_pieces |= rook_to;
@@ -365,7 +362,7 @@ impl Chessboard {
        for rank in 0..8 {
            json.push_str("\t\t[");
            for file in 0..8 {
-               let square = (file + rank * 8);
+               let square = file + rank * 8;
                let square_mask: u64 = 1u64 << square;
                let (piece_type, color) = self.get_piece_at(square_mask);
                let piece_value = match (piece_type, color) {
@@ -401,13 +398,6 @@ impl Chessboard {
        json.push_str("\t]\n");
        json.push_str("}\n");
        json
-   }
-
-   fn print_history(&self) {
-       println!("Chessboard history \n -----------------");
-       for (i, entry) in self.history.iter().enumerate() {
-           println!("Entry {}: pieces={:?}, castling={:#06b}, ep={}", i, entry.pieces, entry.castling_rights, entry.en_passant);
-       }
    }
 }
 
