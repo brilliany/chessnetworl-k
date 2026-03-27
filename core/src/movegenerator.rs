@@ -1,6 +1,6 @@
 use crate::chessboard::Chessboard;
 use crate::r#move::Move;
-use crate::{BISHOP, BLACK, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE};
+use crate::{BISHOP, BLACK, BLACK_KINGSIDE_CASTLE, BLACK_QUEENSIDE_CASTLE, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE, WHITE_KINGSIDE_CASTLE, WHITE_QUEENSIDE_CASTLE};
 
 pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
     let mut moves = Vec::new();
@@ -24,7 +24,6 @@ pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
 }
 
 //todo castling, en pessant, promotion
-
 pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
     // todo add an 'en pessant mask' and use that instead of checking the last move
     if color == WHITE {
@@ -35,47 +34,99 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         //mask for moves forward
         let mut move_mask =
             //we dont care about pawns on the last ranks
-            (pawns &! RANKS[7]) << 8
-            //dont generate when pieces are in front
-            &! (pieces | opponent_pieces);
+            (pawns & !RANKS[7]) << 8
+                //dont generate when pieces are in front
+                & !(pieces | opponent_pieces);
 
+        let mut promotion_mask = move_mask & RANKS[7];
+
+        move_mask &= !promotion_mask;
 
         //store mask for pawns that can move two steps on rank 6 (from white perspective)
-        let mut two_step_pawns = ((move_mask & RANKS[2]) << 8) &! (pieces | opponent_pieces);
+        let mut two_step_pawns = ((move_mask & RANKS[2]) << 8) & !(pieces | opponent_pieces);
 
-        //masks for capturing moves
-        let en_passant_mask = 1u64 << ((chessboard.get_castling_en_passant() & 0b0000_1111) + 32);
-        let mut right_capture_mask = ((pawns &! FILES[0]) << 7) & opponent_pieces
-            //pawns which have their capture square on the current en passant square
-            | ((pawns &! FILES[0]) << 7) & en_passant_mask;
-        let mut left_capture_mask = (pawns &! FILES[7]) << 9 & opponent_pieces
-            | ((pawns &! FILES[7]) << 9) & en_passant_mask;
-        
+        //masks for capturing moves (normal captures only)
+        let mut right_capture_mask = ((pawns & !FILES[0]) << 7) & opponent_pieces;
+        let mut left_capture_mask = (pawns & !FILES[7]) << 9 & opponent_pieces;
+
+        let mut right_promotion_capture_mask = right_capture_mask & RANKS[7];
+        let mut left_promotion_capture_mask = left_capture_mask & RANKS[7];
+
+        right_capture_mask &= !right_promotion_capture_mask;
+        left_capture_mask &= !left_promotion_capture_mask;
+
         while move_mask != 0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
             let from_square = to_square >> 8;
             moves.push(Move::new(from_square, to_square));
-            move_mask &= move_mask -1;
+            move_mask &= move_mask - 1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let to_square = 1u64 << two_step_pawns.trailing_zeros();
             let from_square = to_square >> 16;
             moves.push(Move::new(from_square, to_square));
-            two_step_pawns &= two_step_pawns -1;
+            two_step_pawns &= two_step_pawns - 1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square >> 9;
             moves.push(Move::new(from_square, to_square));
-            left_capture_mask &= left_capture_mask -1;
+            left_capture_mask &= left_capture_mask - 1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square >> 7;
             moves.push(Move::new(from_square, to_square));
-            right_capture_mask &= right_capture_mask -1;
+            right_capture_mask &= right_capture_mask - 1;
+        }
+
+        let target_file = chessboard.get_en_passant();
+        if target_file != 0 {
+            let to_square = 1u64 << ((target_file - 1) as u32 + 40);
+            let captured_square = to_square >> 8;
+
+            // check if the right capture can perform en passant
+            let right_capture = (captured_square & !FILES[0]) >> 1;
+            if right_capture & pawns != 0 {
+                let from_square = right_capture;
+                moves.push(Move::en_passant(from_square, to_square, captured_square));
+            }
+
+            // check if the left capture can perform en passant
+            let left_capture = (captured_square & !FILES[7]) << 1;
+            if left_capture & pawns != 0 {
+                let from_square = left_capture;
+                moves.push(Move::en_passant(from_square, to_square, captured_square));
+            }
+        }
+
+        while left_promotion_capture_mask != 0 {
+            let to_square = 1u64 << left_promotion_capture_mask.trailing_zeros();
+            let from_square = to_square >> 9;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            left_promotion_capture_mask &= left_promotion_capture_mask - 1;
+        }
+
+        while right_promotion_capture_mask != 0 {
+            let to_square = 1u64 << right_promotion_capture_mask.trailing_zeros();
+            let from_square = to_square >> 7;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            right_promotion_capture_mask &= right_promotion_capture_mask - 1;
+        }
+
+        while promotion_mask != 0 {
+            let to_square = 1u64 << promotion_mask.trailing_zeros();
+            let from_square = to_square >> 8;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            promotion_mask &= promotion_mask - 1;
         }
     } else {
         let pieces = chessboard.get_black_pieces();
@@ -86,65 +137,106 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         //mask for moves forward
         let mut move_mask =
             //we dont care about pawns on the last ranks
-            (pawns &! RANKS[0]) >> 8
-            //dont generate when pieces are in front
-            &! ((pieces | opponent_pieces));
+            (pawns & !RANKS[0]) >> 8
+                //dont generate when pieces are in front
+                & !((pieces | opponent_pieces));
+
+        let mut promotion_mask = move_mask & RANKS[0];
+
+        move_mask &= !promotion_mask;
 
         //store mask for pawns that can move two steps on rank 1 (from black perspective)
-        let mut two_step_pawns = ((move_mask & RANKS[5]) >> 8) &! ((pieces | opponent_pieces));
+        let mut two_step_pawns = ((move_mask & RANKS[5]) >> 8) & !((pieces | opponent_pieces));
 
-        //masks for capturing moves
-        let en_passant_mask = 1u64 << ((chessboard.get_castling_en_passant() & 0b0000_1111) + 16);
+        //masks for capturing moves (normal captures only)
+        let mut right_capture_mask = ((pawns & !FILES[0]) >> 9) & opponent_pieces;
+        let mut left_capture_mask = (pawns & !FILES[7]) >> 7 & opponent_pieces;
 
-        let mut right_capture_mask = ((pawns &! FILES[0]) >> 9) & opponent_pieces
-        | ((pawns &! FILES[0]) >> 9) & en_passant_mask;
-        let mut left_capture_mask = (pawns &! FILES[7]) >> 7 & opponent_pieces
-            | ((pawns &! FILES[7]) >> 7) & en_passant_mask;
+        let mut right_promotion_capture_mask = right_capture_mask & RANKS[0];
+        let mut left_promotion_capture_mask = left_capture_mask & RANKS[0];
 
-        while move_mask !=0 {
+        right_capture_mask &= !right_promotion_capture_mask;
+        left_capture_mask &= !left_promotion_capture_mask;
+
+        while move_mask != 0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
             let from_square = to_square << 8;
             moves.push(Move::new(from_square, to_square));
-            move_mask &= move_mask -1;
+            move_mask &= move_mask - 1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let to_square = 1u64 << two_step_pawns.trailing_zeros();
             let from_square = to_square << 16;
             moves.push(Move::new(from_square, to_square));
-            two_step_pawns &= two_step_pawns -1;
+            two_step_pawns &= two_step_pawns - 1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square << 7;
             moves.push(Move::new(from_square, to_square));
-            left_capture_mask &= left_capture_mask -1;
+            left_capture_mask &= left_capture_mask - 1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square << 9;
             moves.push(Move::new(from_square, to_square));
-            right_capture_mask &= right_capture_mask -1;
+            right_capture_mask &= right_capture_mask - 1;
+        }
+
+
+        // En passant captures
+        let target_file = chessboard.get_en_passant();
+        if target_file != 0 {
+            let to_square = 1u64 << ((target_file - 1) as u32 + 16);
+            let captured_square = to_square << 8;
+
+            // check if the right capture can perform en passant
+            let right_capture = (captured_square & !FILES[7]) << 1;
+            if right_capture & pawns != 0 {
+                let from_square = right_capture;
+                moves.push(Move::en_passant(from_square, to_square, captured_square));
+            }
+
+            let left_capture = (captured_square & !FILES[0]) >> 1;
+            if left_capture & pawns != 0 {
+                let from_square = left_capture;
+                moves.push(Move::en_passant(from_square, to_square, captured_square));
+            }
+        }
+
+        while left_promotion_capture_mask != 0 {
+            let to_square = 1u64 << left_promotion_capture_mask.trailing_zeros();
+            let from_square = to_square << 7;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            left_promotion_capture_mask &= left_promotion_capture_mask - 1;
+        }
+
+        while right_promotion_capture_mask != 0 {
+            let to_square = 1u64 << right_promotion_capture_mask.trailing_zeros();
+            let from_square = to_square << 9;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            right_promotion_capture_mask &= right_promotion_capture_mask - 1;
+        }
+
+        while promotion_mask != 0 {
+            let to_square = 1u64 << promotion_mask.trailing_zeros();
+            let from_square = to_square << 8;
+            for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
+                moves.push(Move::promotion(from_square, to_square, piece_type));
+            }
+            promotion_mask &= promotion_mask - 1;
         }
     };
-    
-    //todo en passant
-        //en passant
-        /*if let Some(last_move) = chessboard.get_history().last() {
-            let black_pieces_prev = last_move.get_black_pieces();
-            if y == if color == 1 { 4 } else { 3 } && (black_pieces_prev & two_step) != 0 {
-                if x != 0 && (opponent_pieces & (1 << (x - 1 + (y + direction) * 8))) != 0 {
-                    moves.push(Move::new(x as u8, y as u8, (x - 1) as u8, (y + direction) as u8));
-                }
-                if x != 7 && (opponent_pieces & (1 << (x + 1 + (y + direction) * 8))) != 0 {
-                    moves.push(Move::new(x as u8, y as u8, (x + 1) as u8, (y + direction) as u8));
-                }
-            }
-        }*/
 }
 
-pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>){
+
+pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
     let mut knight_mask = chessboard.get_piece_mask(KNIGHT, color);
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
 
@@ -333,6 +425,7 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
     let mut king_mask = chessboard.get_piece_mask(KING, color);
 
     let own_pieces = if color == WHITE { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
+    let castling_rights = chessboard.get_castling_rights();
 
     while king_mask != 0 {
         let from = 1u64 << king_mask.trailing_zeros();
@@ -340,35 +433,73 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
         let mut move_mask = 0u64;
 
         //left
-        move_mask |= ((from &! FILES[0]) >> 1)
-            | ((from &! (FILES[0] | RANKS[7])) >> 9)
-            | ((from &! (FILES[7] | RANKS[7])) >> 7)
-            | ((from &! RANKS[0]) >> 8)
-            | ((from &! RANKS[7]) << 8);
+        move_mask |= ((from & !FILES[0]) >> 1)
+            | ((from & !(FILES[0] | RANKS[7])) >> 9)
+            | ((from & !(FILES[7] | RANKS[7])) >> 7)
+            | ((from & !RANKS[0]) >> 8)
+            | ((from & !RANKS[7]) << 8);
 
-        //ect
-        move_mask |= ((from &! FILES[7]) << 1)
-            | ((from &! (FILES[0] | RANKS[7])) << 7)
-            | ((from &! (FILES[7] | RANKS[7])) << 9)
-            | ((from &! RANKS[0]) >> 8)
-            | ((from &! RANKS[7]) << 8);
+        //etc
+        move_mask |= ((from & !FILES[7]) << 1)
+            | ((from & !(FILES[0] | RANKS[7])) << 7)
+            | ((from & !(FILES[7] | RANKS[7])) << 9)
+            | ((from & !RANKS[0]) >> 8)
+            | ((from & !RANKS[7]) << 8);
 
         move_mask &= !own_pieces;
 
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-
             chessboard.make_move(Move::new(from, to));
-
             if !is_square_attacked(chessboard, to, -color) {
                 moves.push(Move::new(from, to));
             }
-
             chessboard.undo_move();
-
             move_mask &= move_mask - 1;
         }
         king_mask &= king_mask - 1;
+    }
+
+    //castling moves
+    let occupied = chessboard.get_white_pieces() | chessboard.get_black_pieces();
+    if color == WHITE {
+        if (castling_rights & WHITE_KINGSIDE_CASTLE) != 0 {
+            if (occupied & ((1 << 1) | (1 << 2))) == 0 {
+                chessboard.make_move(Move::castling(1 << 3, 1 << 1, 1 << 0, 1 << 2));
+                if !is_square_attacked(chessboard, 1 << 2, -color) && !is_square_attacked(chessboard, 1 << 1, -color) {
+                    moves.push(Move::castling(1 << 3, 1 << 1, 1 << 0, 1 << 2));
+                }
+                chessboard.undo_move();
+            }
+        }
+        if (castling_rights & WHITE_QUEENSIDE_CASTLE) != 0 {
+            if (occupied & ((1 << 4) | (1 << 5) | (1 << 6))) == 0 {
+                chessboard.make_move(Move::castling(1 << 3, 1 << 5, 1 << 7, 1 << 4));
+                if !is_square_attacked(chessboard, 1 << 4, -color) && !is_square_attacked(chessboard, 1 << 5, -color) {
+                    moves.push(Move::castling(1 << 3, 1 << 5, 1 << 7, 1 << 4));
+                }
+                chessboard.undo_move();
+            }
+        }
+    } else {
+        if (castling_rights & BLACK_KINGSIDE_CASTLE) != 0 {
+            if (occupied & ((1 << 57) | (1 << 58))) == 0 {
+                chessboard.make_move(Move::castling(1 << 59, 1 << 57, 1 << 56, 1 << 58));
+                if !is_square_attacked(chessboard, 1 << 58, -color) && !is_square_attacked(chessboard, 1 << 57, -color) {
+                    moves.push(Move::castling(1 << 59, 1 << 57, 1 << 56, 1 << 58));
+                }
+                chessboard.undo_move();
+            }
+        }
+        if (castling_rights & BLACK_QUEENSIDE_CASTLE) != 0 {
+            if (occupied & ((1 << 60) | (1 << 61) | (1 << 62))) == 0 {
+                chessboard.make_move(Move::castling(1 << 59, 1 << 61, 1 << 63, 1 << 60));
+                if !is_square_attacked(chessboard, 1 << 60, -color) && !is_square_attacked(chessboard, 1 << 61, -color) {
+                    moves.push(Move::castling(1 << 59, 1 << 61, 1 << 63, 1 << 60));
+                }
+                chessboard.undo_move();
+            }
+        }
     }
 }
 
@@ -414,5 +545,7 @@ pub fn is_square_attacked(chessboard: &Chessboard, square_mask: u64, attacker_co
 
     false
 }
+
+
 
 

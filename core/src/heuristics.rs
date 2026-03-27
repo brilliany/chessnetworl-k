@@ -75,10 +75,10 @@ impl Heuristics {
     pub fn castling(&self) -> i32 {
         let mut score: i32 = 0;
         if self.color == WHITE {
-            let white_king_short: u64 = self.white_kings & (1 << 62);
-            let white_rook_short: u64 = self.white_rooks & (1 << 61);
-            let white_king_long: u64 = self.white_kings & (1 << 58);
-            let white_rook_long: u64 = self.white_rooks & (1 << 59);
+            let white_king_long: u64 = self.white_kings & (1 << 6);
+            let white_rook_long: u64 = self.white_rooks & (1 << 5);
+            let white_king_short: u64 = self.white_kings & (1 << 1);
+            let white_rook_short: u64 = self.white_rooks & (1 << 2);
             if white_king_short != 0 && white_rook_short != 0 {
                 score += CASTLING_SCORE;
             }
@@ -86,10 +86,10 @@ impl Heuristics {
                 score += CASTLING_SCORE;
             }
         } else {
-            let black_king_short: u64 = self.black_kings & (1 << 6);
-            let black_rook_short: u64 = self.black_rooks & (1 << 5);
-            let black_king_long: u64 = self.black_kings & (1 << 2);
-            let black_rook_long: u64 = self.black_rooks & (1 << 3);
+            let black_king_long: u64 = self.black_kings & (1 << 61);
+            let black_rook_long: u64 = self.black_rooks & (1 << 60);
+            let black_king_short: u64 = self.black_kings & (1 << 57);
+            let black_rook_short: u64 = self.black_rooks & (1 << 58);
             if black_king_short != 0 && black_rook_short != 0 {
                 score += CASTLING_SCORE;
             }
@@ -103,22 +103,22 @@ impl Heuristics {
     pub fn development(&self) -> i32 {
         let mut score: i32 = 0;
         if self.color == WHITE {
-            score += (self.white_knights & !(1 << 57 | 1 << 62)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.white_knights & !(1 << 1 | 1 << 6)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after knights: {}", score);
-            score += (self.white_bishops & !(1 << 58 | 1 << 61)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.white_bishops & !(1 << 2 | 1 << 5)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after bishops: {}", score);
-            score += (self.white_rooks & !(1 << 56 | 1 << 63)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.white_rooks & !(1 << 0 | 1 << 7)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after rooks: {}", score);
-            score += (self.white_queens & !(1 << 59)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.white_queens & !(1 << 4)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after queens: {}", score);
         } else {
-            score += (self.black_knights & !(1 << 1 | 1 << 6)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.black_knights & !(1 << 57 | 1 << 62)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after knights: {}", score);
-            score += (self.black_bishops & !(1 << 2 | 1 << 5)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.black_bishops & !(1 << 58 | 1 << 61)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after bishops: {}", score);
-            score += (self.black_rooks & !(1 << 0 | 1 << 7)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.black_rooks & !(1 << 56 | 1 << 63)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after rooks: {}", score);
-            score += (self.black_queens & !(1 << 3)).count_ones() as i32 * DEVELOPMENT_SCORE;
+            score += (self.black_queens & !(1 << 59)).count_ones() as i32 * DEVELOPMENT_SCORE;
             // println!("score after queens: {}", score);
         }
         score

@@ -3,11 +3,12 @@ const sessionId = getCookie("session_id");
 let color = 0;
 let savedPossibleMoves = []
 let pieces = [] // keeps track of the pieces on the board, the 'element' property might not correspond to the actual element on the board
+let isSubmittingMove = false;
 
 
-await initialRequest(sessionId);
+initialRequest(sessionId);
 async function initialRequest(sessionId) {
-    let data = await getSession(sessionId);
+    let data = await getSession(sessionId, "Could not get color");
     color = -data.opponent;
     populateBoard(sessionId);
 }
@@ -54,7 +55,7 @@ function populateBoard() {
                         const squareElement = rowElement.children[j];
                         console.log("squareElement has " + squareElement.children.length + " children");
                         if (piece_name !== "empty") {
-                            addPieceToSquare(squareElement, piece_name, j, i);
+                            addPieceToSquare(squareElement, piece_name, j, i, color, savedPossibleMoves, pieces, makeMove);
                         } else {
                             squareElement.children[0].innerHTML = "";
                         }
@@ -66,80 +67,12 @@ function populateBoard() {
         }
     });
 }
-
-
-function addPieceToSquare(squareElement, piece_name,x,y) {
-    const pieceElement = squareElement.children[0];
-    //if the piece element doesn't have a child, add one
-    if (pieceElement.children.length === 0) {
-        const pieceImg = document.createElement("img");
-        pieceElement.appendChild(pieceImg);
+function makeMove(x, y, toX, toY, specialMove) {
+    if (isSubmittingMove) {
+        return;
     }
-    const pieceImg = pieceElement.children[0];
-    pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
-    pieceImg.setAttribute("alt", piece_name);
+    isSubmittingMove = true;
 
-    let listenerFunction = null;
-    //add event listener to piece if it's the player's color
-    if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
-        listenerFunction = addListenerToPiece(pieceImg, piece_name, x, y);
-    }
-    pieces.push({
-        location: [x, y],
-        piece: piece_name,
-        element: pieceImg,
-        listenerFunction: listenerFunction,
-    })
-}
-function addListenerToPiece(pieceImg, piece_name, x, y) {
-    let listenerFunction = async function () {
-        if (savedPossibleMoves.length > 0) {
-            //remove all possible move squares
-            removePossibleMoves();
-            return;
-        }
-        console.log("Clicked on piece " + piece_name + " at " + x + ", " + y);
-        let queries = [
-            ["x", 7 - x],
-            ["y", 7 - y],
-            ["color", color],
-        ];
-        await fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            credentials: "include",
-        }).then((response) => {
-            if (response.status === 200) {
-                response.json().then((data) => {
-                    let possibleMoves = data.moves;
-                    for (let i = 0; i < possibleMoves.length; i++) {
-                        const toX = 7 - possibleMoves[i].to_x;
-                        const toY = 7 - possibleMoves[i].to_y;
-                        const toSquare = document.getElementById("row" + toY).children[toX];
-                        console.log("Possible move added")
-                        toSquare.classList.add("possible-move");
-                        let possibleMoveListener = function () {
-                            makeMove(x, y, toX, toY, piece_name);
-                        };
-                        toSquare.addEventListener("click", possibleMoveListener, {once: true});
-                        savedPossibleMoves.push({
-                            location: [toX, toY],
-                            listenerFunction: possibleMoveListener,
-                        });
-                    }
-                });
-            } else {
-                alert("Could not get possible moves");
-            }
-        });
-    };
-    pieceImg.addEventListener("click", listenerFunction);
-    return listenerFunction;
-}
-
-function makeMove(x, y, toX, toY) {
     let queries = [
         //we have to flip the board for the internal board
         ["from_x", 7-x],
@@ -147,6 +80,9 @@ function makeMove(x, y, toX, toY) {
         ["to_x", 7-toX],
         ["to_y", 7-toY],
     ]
+    if (specialMove) {
+        queries.push(["special_move", specialMove]);
+    }
     fetch("/api/move-piece" + "?" + new URLSearchParams(queries), {
         method: "POST",
         headers: {
@@ -156,14 +92,18 @@ function makeMove(x, y, toX, toY) {
 
     }).then((response) => {
         if (response.status === 200) {
-            movePiece(x, y, toX, toY);
+            movePiece(x, y, toX, toY, specialMove);
             makeEngineMove();
         } else {
+            isSubmittingMove = false;
             alert("Could not move piece");
         }
+    }).catch(() => {
+        isSubmittingMove = false;
+        alert("Could not move piece");
     });
 }
-function movePiece(x, y, toX, toY) {
+function movePiece(x, y, toX, toY, specialMove = "normal") {
  //moves a specific piece from one square to another in the html
     const fromSquare = document.getElementById("row" + y).children[x];
     const toSquare = document.getElementById("row" + toY).children[toX];
@@ -176,7 +116,9 @@ function movePiece(x, y, toX, toY) {
     }
     let pieceElement = first.children[0];
     //if piece on toSquare, remove it
-    if (toSquare.children[0].children.length > 0) {
+    if (specialMove === "en_passant") {
+        document.getElementById("row" + (toY + color)).children[toX].children[0].children[0].remove()
+    } else if (toSquare.children[0].children.length > 0) {
         toSquare.children[0].children[0].remove();
     } else if (pawn && toX !== x) {
         document.getElementById("row" + (toY + color)).children[toX].children[0].children[0].remove()
@@ -185,18 +127,34 @@ function movePiece(x, y, toX, toY) {
     first.innerHTML = "";
     //add piece to toSquare
     toSquare.children[0].appendChild(pieceElement);
+
+    if (specialMove === "castling") {
+        const rookFromX = toX > x ? 7 : 0;
+        const rookToX = toX > x ? toX - 1 : toX + 1;
+        const rookFromSquare = document.getElementById("row" + y).children[rookFromX];
+        const rookToSquare = document.getElementById("row" + y).children[rookToX];
+        if (rookFromSquare.children[0].children.length > 0) {
+            const rookElement = rookFromSquare.children[0].children[0];
+            rookFromSquare.children[0].innerHTML = "";
+            if (rookToSquare.children[0].children.length > 0) {
+                rookToSquare.children[0].children[0].remove();
+            }
+            rookToSquare.children[0].appendChild(rookElement);
+        }
+    }
+
     //add event listener to piece if it's the player's color
     const pieceColor = pieceElement.getAttribute("alt").startsWith("white") ? 1 : -1;
     if (pieceColor === color) {
-        addListenerToPiece(pieceElement, pieceElement.getAttribute("alt"), toX, toY);
+        addListenerToPiece(pieceElement, pieceElement.getAttribute("alt"), toX, toY, color, savedPossibleMoves, makeMove);
     }
-    removePossibleMoves();
+    removePossibleMoves(savedPossibleMoves);
 }
 const frozenSquares = [];
 
 function freezeBoard() {
     //this method should freeze the board, so that the player can't move any pieces
-    removePossibleMoves();
+    removePossibleMoves(savedPossibleMoves);
     frozenSquares.length = 0;
     //loop through all squares and remove event listeners from own pieces
     for (let i = 0; i < pieces.length; i++) {
@@ -236,65 +194,17 @@ function makeEngineMove() {
                 const fromY = 7 - json.from_y;
                 const toX = 7 - json.to_x;
                 const toY = 7 - json.to_y;
-                movePiece(fromX, fromY, toX, toY);
+                movePiece(fromX, fromY, toX, toY, json.special_move || "normal");
                 unfreezeBoard();
+                isSubmittingMove = false;
                 console.log("Engine moved from " + fromX + ", " + fromY + " to " + toX + ", " + toY);
             });
         } else {
+            isSubmittingMove = false;
             alert("Could not make engine move");
         }
+    }).catch(() => {
+        isSubmittingMove = false;
+        alert("Could not make engine move");
     });
-}
-function removePossibleMoves() {
-    console.log("Removing possible moves: " + savedPossibleMoves.length);
-    for(let i = savedPossibleMoves.length - 1; i >= 0; i--){
-        const move = savedPossibleMoves[i].location;
-        const square = document.getElementById("row" + move[1]).children[move[0]];
-        square.classList.remove("possible-move");
-        square.removeEventListener("click", savedPossibleMoves[i].listenerFunction, {once: true});
-        //remove from savedPossibleMoves
-        savedPossibleMoves.splice(i, 1);
-        console.log("Removed possible move index " + i);
-    }
-}
-
-
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';'); //split cookies by ;
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim(); //trim spaces
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) === (name + '=')) { //if cookie name is found
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); //get cookie value
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-async function getSession(sessionID) {
-    let data;
-    await fetch("/api/get-session", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
-    }).then(async (response) => {
-        console.log(response)
-        if (response.status === 200) {
-            await response.json().then((raw) => {
-                console.log(raw)
-                data = raw;
-            });
-        } else {
-            alert("Could not get color");
-        }
-    });
-    console.log(data)
-    return data;
 }

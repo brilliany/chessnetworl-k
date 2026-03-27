@@ -1,5 +1,5 @@
 use crate::*;
-use crate::r#move::Move;
+use crate::r#move::{Move, MoveType};
 use rand:: {Rng, SeedableRng};
 use rand:: rngs::StdRng;
 
@@ -18,7 +18,8 @@ pub struct BoardState {
     pieces: [u64; 12],
     white_pieces: u64,
     black_pieces: u64,
-    castling_en_passant: u8,
+    castling_rights: u8,
+    en_passant: u8,
     zobrist_hash: u64,
 }
 
@@ -33,29 +34,18 @@ pub struct Chessboard {
 
     black_pieces: u64, //bitboard for all black pieces
 
-    /**
+    /// Castling rights as 4-bit flags:
+    /// bit 0: black kingside, bit 1: black queenside,
+    /// bit 2: white kingside, bit 3: white queenside
+    castling_rights: u8,
 
-    castling rights stored in bit flags, 1 for right, 0 for no right
-    first bit: black kingside, second bit: black queenside, third bit: white kingside, fourth bit: white queenside
+    /// En passant target file, stored as a 1-based index [1–8], or 0 for none.
+    /// The same encoding is used regardless of which color just double-pushed.
+    /// The move generator derives the correct rank from context:
+    ///   - White captures, moving to rank 5, capturing pawn on rank 4: bit index = (file-1) + 4*8
+    ///   - Black captures, moving to rank 2, capturing pawn on rank 3: bit index = (file-1) + 3*8
+    en_passant: u8,
 
-    castling in 4 bits starting from top left (0, 0), just a bit flag for if castling is available for that corner
-    en passant is the remaining 4 bits, read as a 4 bit number 0-15, indexing a square on the 2 ranks where en passant is possible
-
-     */
-    /*
-    en passant squares:
-    A B C D E F G H
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    x x x x x x x x
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    x x x x x x x x
-    0 0 0 0 0 0 0 0
-    0 0 0 0 0 0 0 0
-    */
-    castling_en_passant: u8,
-    
     //history stack for undoing moves
     history: Vec<BoardState>,
 
@@ -86,12 +76,19 @@ impl Chessboard {
         self.black_pieces = black_pieces;
     }
 
-    pub fn get_castling_en_passant(&self) -> u8 {
-        self.castling_en_passant.clone()
+    pub fn get_castling_rights(&self) -> u8 {
+        self.castling_rights
     }
-    pub fn set_castling_en_passant(&mut self, castling_en_passant: u8) {
-        self.castling_en_passant = castling_en_passant;
+    pub fn set_castling_rights(&mut self, rights: u8) {
+        self.castling_rights = rights;
     }
+    pub fn get_en_passant(&self) -> u8 {
+        self.en_passant
+    }
+    pub fn set_en_passant(&mut self, ep: u8) {
+        self.en_passant = ep;
+    }
+
     pub fn get_history(&self) -> &Vec<BoardState> {
         &self.history
     }
@@ -116,7 +113,8 @@ impl Chessboard {
                 self.black_pieces |= mask;
             }
         }
-        self.set_castling_en_passant(0b1111_0000); //all castling rights available, no en passant
+        self.set_castling_rights(0b1111); // all castling rights available
+        self.set_en_passant(0);           // no en passant
     }
 
     pub fn get_piece_at(&self, pos: u64) -> (u8, i8) {
@@ -162,7 +160,8 @@ impl Chessboard {
             pieces: self.pieces,
             white_pieces: self.white_pieces,
             black_pieces: self.black_pieces,
-            castling_en_passant: self.castling_en_passant,
+            castling_rights: self.castling_rights,
+            en_passant: self.en_passant,
             zobrist_hash: self.zobrist_hash,
         });
 
@@ -171,44 +170,17 @@ impl Chessboard {
         let piece = self.get_piece_at(from);
         let (piece_type, color) = piece;
 
-        //if en passant is assigned, clear it, since we're making a move
-        zobrist.toggle_en_passant(&mut self.zobrist_hash, (self.castling_en_passant & 0b0000_1111) as usize);
-        self.castling_en_passant &= 0b1111_0000;
+        // If en passant is active, XOR it out of the hash before clearing it
+        if self.en_passant != 0 {
+            zobrist.toggle_en_passant(&mut self.zobrist_hash, self.en_passant as usize);
+        }
+        self.en_passant = 0;
 
+        // Update castling rights
+        self.update_castling_rights(from, to, zobrist);
         self.assign_en_passant(from, to, piece_type, color, zobrist);
 
-        /*todo castling and en passant
-       let old_ep = self.castling_en_passant & 0x0F;
-       if old_ep != 0 {
-           let old_file = (old_ep as usize) % 8;
-           zobrist.toggle_en_passant(&mut self.zobrist_hash, old_file);
-       }
-
-       // Handle castling rights changes
-       let old_castling = self.castling_en_passant >> 4;
-        }*/
-
-
-       self.move_piece(piece_type, color, from, to, zobrist);
-
-       /*todo  check if castling rights changed (rook/king moved or rook captured)
-       let new_castling = self.update_castling_rights(piece_type, color, from, to);
-
-       XOR out old castling rights, XOR in new ones
-       for i in 0..4 {
-           let old_bit = (old_castling >> i) & 1;
-           let new_bit = (new_castling >> i) & 1;
-           if old_bit != new_bit {
-               zobrist. toggle_castling(&mut self. zobrist_hash, i);
-           }
-       }*/
-
-       /* todo en passant using files
-       let new_ep = self.calculate_en_passant(piece_type, color, from, to);
-       if new_ep != 0 {
-           let new_file = (new_ep as usize) % 8;
-           zobrist.toggle_en_passant(&mut self.zobrist_hash, new_file);
-       }*/
+       self.move_piece(piece_type, color, &mv, zobrist);
 
        // Toggle side to move
        zobrist.toggle_side(&mut self.zobrist_hash);
@@ -216,22 +188,61 @@ impl Chessboard {
    }
 
     fn assign_en_passant(&mut self, from: u64, to: u64, piece_type: u8, color: i8, zobrist: &ZobristTable) {
-        //setting en passant in case the move is a two square pawn push
+        // Set en_passant to the file (1–8) of the pawn that just double-pushed, or 0 for none.
+        // Using 1-based file so that 0 unambiguously means "no en passant".
         if (piece_type, color) == (PAWN, WHITE) && from << 16 == to {
-            // transforming the square into a number that fits into 4 bits
-            let en_passant_index = ((from << 8).trailing_zeros() - 16) as u8;
-            zobrist.toggle_en_passant(&mut self.zobrist_hash, en_passant_index as usize);
-            //zero en passant bits
-            let current_state = self.castling_en_passant & 0b1111_0000;
-            //add new
-            self.set_castling_en_passant(current_state | en_passant_index)
+            // from is on rank 1 (bits 8–15); file = bit_index % 8, stored 1-based
+            let file = (from.trailing_zeros() % 8 + 1) as u8;
+            zobrist.toggle_en_passant(&mut self.zobrist_hash, file as usize);
+            self.en_passant = file;
         } else if (piece_type, color) == (PAWN, BLACK) && from >> 16 == to {
-            let en_passant_index = ((from >> 8).trailing_zeros() - 32) as u8;
-            zobrist.toggle_en_passant(&mut self.zobrist_hash, en_passant_index as usize);
-            //zero en passant bits but keep castling
-            let current_state = self.castling_en_passant & 0b1111_0000;
-            //add new
-            self.set_castling_en_passant(current_state | en_passant_index)
+            // from is on rank 6 (bits 48–55); file = bit_index % 8, stored 1-based
+            let file = (from.trailing_zeros() % 8 + 1) as u8;
+            zobrist.toggle_en_passant(&mut self.zobrist_hash, file as usize);
+            self.en_passant = file;
+        }
+    }
+
+    fn update_castling_rights(&mut self, from: u64, to: u64, zobrist: &ZobristTable) {
+        let old_castling = self.castling_rights;
+        let mut new_castling = old_castling;
+
+        // White King moved (d1 in this board setup)
+        if (from & (1u64 << 3)) != 0 {
+            new_castling &= !WHITE_QUEENSIDE_CASTLE; // White queenside
+            new_castling &= !WHITE_KINGSIDE_CASTLE;  // White kingside
+        }
+        // Black King moved (d8 in this board setup)
+        if (from & (1u64 << 59)) != 0 {
+            new_castling &= !BLACK_QUEENSIDE_CASTLE; // Black queenside
+            new_castling &= !BLACK_KINGSIDE_CASTLE;  // Black kingside
+        }
+
+        // Check if rooks are moved or captured (a1, h1, a8, h8)
+
+        if (from & (1u64 << 7)) != 0 || (to & (1u64 << 7)) != 0 {
+            new_castling &= !WHITE_QUEENSIDE_CASTLE; // White queenside
+        }
+        if (from & (1u64 << 0)) != 0 || (to & (1u64 << 0)) != 0 {
+            new_castling &= !WHITE_KINGSIDE_CASTLE; // White kingside
+        }
+        if (from & (1u64 << 63)) != 0 || (to & (1u64 << 63)) != 0 {
+            new_castling &= !BLACK_QUEENSIDE_CASTLE; // Black queenside
+        }
+        if (from & (1u64 << 56)) != 0 || (to & (1u64 << 56)) != 0 {
+            new_castling &= !BLACK_KINGSIDE_CASTLE; // Black kingside
+        }
+
+        if new_castling != old_castling {
+            // Update Zobrist hash for castling rights
+            for i in 0..4 {
+                let old_bit = (old_castling >> i) & 1;
+                let new_bit = (new_castling >> i) & 1;
+                if old_bit != new_bit {
+                    zobrist.toggle_castling(&mut self.zobrist_hash, i);
+                }
+            }
+            self.castling_rights = new_castling;
         }
     }
 
@@ -239,57 +250,100 @@ impl Chessboard {
      Move a piece from one square to another ONLY ON THE PIECE'S OWN BITBOARD
      The move_piece and remove_piece functions assume that the move is valid and legal
     */
-   //todo en pessant, castling, promotion
-   fn move_piece(&mut self, piece: u8, color: i8, from: u64, to: u64, zobrist: &ZobristTable) {
-       let array_index= piece_index(piece, color).unwrap();
+   fn move_piece(&mut self, piece: u8, color: i8, mv: &Move, zobrist: &ZobristTable) {
+       let from = mv.get_from_mask();
+       let to = mv.get_to_mask();
+       let array_index = piece_index(piece, color).unwrap();
 
        let from_sq = from.trailing_zeros() as usize;
        let to_sq = to.trailing_zeros() as usize;
 
-       //XOR out the moving piece from its origin square
+       // XOR out the moving piece from its origin square
        zobrist.toggle_piece(&mut self.zobrist_hash, piece, color, from_sq);
 
-        //XOR out any piece on the destination
-        for p in PAWN..=KING {
-            if (self.get_piece_mask(p, WHITE) & to) != 0 {
-                zobrist. toggle_piece(&mut self.zobrist_hash, p, WHITE, to_sq);
-                self.set_piece_mask(p, WHITE, self.get_piece_mask(p, WHITE) & !to);
-                self.white_pieces &= ! to;
-            }
-            if (self.get_piece_mask(p, BLACK) & to) != 0 {
-                zobrist.toggle_piece(&mut self.zobrist_hash, p, BLACK, to_sq);
-                self.set_piece_mask(p, BLACK, self.get_piece_mask(p, BLACK) & !to);
-                self.black_pieces &= !to;
-            }
-        }
+       // Remove any piece on the destination square (normal capture)
+       self.clear_square(to, zobrist);
 
-        // en passant
-        // if a pawn is moving diagonally without anything on the destination square, remove a piece behind it
-        if (piece, color) == (PAWN, WHITE) && ((from << 7) == to || (from << 9) == to) && ((self.black_pieces & to) == 0) {
-            // Clear the captured black pawn from its original square (behind the destination)
-            let captured_square = to >> 8; // The square where the captured black pawn was
-            self.set_piece_mask(PAWN, BLACK, self.get_piece_mask(PAWN, BLACK) & !captured_square); // Clear from black pawn bitboard
-        } else if (piece, color) == (PAWN, BLACK) && ((from >> 7) == to || (from >> 9) == to) && ((self.white_pieces & to) == 0) {
-            // Clear the captured white pawn from its original square (behind the destination)
-            let captured_square = to << 8; // The square where the captured white pawn was
-            self.set_piece_mask(PAWN, WHITE, self.get_piece_mask(PAWN, WHITE) & !captured_square); // Clear from white pawn bitboard
-        }
+       // Handle special moves
+       match mv.mv_type() {
+           MoveType::Normal => {}
+           MoveType::EnPassant { captured_square } => {
+               self.clear_square(captured_square, zobrist);
+           }
+           MoveType::Castling { rook_from, rook_to } => {
+               let rook_from_sq = rook_from.trailing_zeros() as usize;
+               let rook_to_sq = rook_to.trailing_zeros() as usize;
 
-       //XOR in the moving piece at its destination
+               //update hash table
+               let rook_idx = piece_index(ROOK, color).unwrap();
+               zobrist.toggle_piece(&mut self.zobrist_hash, ROOK, color, rook_from_sq);
+               self.pieces[rook_idx] &= !rook_from;
+               self.pieces[rook_idx] |= rook_to;
+               zobrist.toggle_piece(&mut self.zobrist_hash, ROOK, color, rook_to_sq);
+
+               // Update color bitboard
+               if color == WHITE {
+                   self.white_pieces &= !rook_from;
+                   self.white_pieces |= rook_to;
+               } else {
+                   self.black_pieces &= !rook_from;
+                   self.black_pieces |= rook_to;
+               }
+           }
+           MoveType::Promotion { promoted_piece } => {
+               // Remove the pawn from its original square
+               self.pieces[array_index] &= !from;
+
+               // Add the promoted piece to the destination square
+               let promo_index = piece_index(promoted_piece, color).unwrap();
+               self.pieces[promo_index] |= to;
+
+               // Update color occupancy for the promotion
+               if color == WHITE {
+                   self.white_pieces &= !from; // Remove pawn
+                   self.white_pieces |= to;    // Add promoted piece
+               } else {
+                   self.black_pieces &= !from; // Remove pawn
+                   self.black_pieces |= to;    // Add promoted piece
+               }
+
+               // Update Zobrist hash: toggle out the pawn and toggle in the promoted piece
+               zobrist.toggle_piece(&mut self.zobrist_hash, PAWN, color, from_sq);
+               zobrist.toggle_piece(&mut self.zobrist_hash, promoted_piece, color, to_sq);
+               return; // Promotion is a special case, so we return early after handling it
+           }
+       }
+
+       // XOR in the moving piece at its destination
        zobrist.toggle_piece(&mut self.zobrist_hash, piece, color, to_sq);
 
+       // Update the piece bitboard
+       self.pieces[array_index] &= !from;
+       self.pieces[array_index] |= to;
 
-       self.pieces[array_index] &= !from; //remove piece from starting square
-       self.pieces[array_index] |= to; //add piece to destination square
-
-       if (self.white_pieces & from) != 0 {
+       // Update color occupancy
+       if color == WHITE {
            self.white_pieces &= !from;
            self.white_pieces |= to;
-       } else if (self.black_pieces & from) != 0 {
+       } else {
            self.black_pieces &= !from;
            self.black_pieces |= to;
-       } else {
-           panic!("No piece at from square");
+       }
+   }
+
+   fn clear_square(&mut self, square: u64, zobrist: &ZobristTable) {
+       let sq = square.trailing_zeros() as usize;
+       for p in 1..=6u8 {
+           if (self.get_piece_mask(p, WHITE) & square) != 0 {
+               zobrist.toggle_piece(&mut self.zobrist_hash, p, WHITE, sq);
+               self.set_piece_mask(p, WHITE, self.get_piece_mask(p, WHITE) & !square);
+               self.white_pieces &= !square;
+           }
+           if (self.get_piece_mask(p, BLACK) & square) != 0 {
+               zobrist.toggle_piece(&mut self.zobrist_hash, p, BLACK, sq);
+               self.set_piece_mask(p, BLACK, self.get_piece_mask(p, BLACK) & !square);
+               self.black_pieces &= !square;
+           }
        }
    }
 
@@ -299,7 +353,8 @@ impl Chessboard {
            self.pieces = state.pieces;
            self.white_pieces = state.white_pieces;
            self.black_pieces = state.black_pieces;
-           self.castling_en_passant = state.castling_en_passant;
+           self.castling_rights = state.castling_rights;
+           self.en_passant = state.en_passant;
            self.zobrist_hash = state.zobrist_hash;
        } else {
            panic!("Cannot undo move: history is empty");
@@ -329,7 +384,7 @@ impl Chessboard {
        for rank in 0..8 {
            json.push_str("\t\t[");
            for file in 0..8 {
-               let square = (file + rank * 8);
+               let square = file + rank * 8;
                let square_mask: u64 = 1u64 << square;
                let (piece_type, color) = self.get_piece_at(square_mask);
                let piece_value = match (piece_type, color) {
@@ -366,17 +421,10 @@ impl Chessboard {
        json.push_str("}\n");
        json
    }
-
-   fn print_history(&self) {
-       println!("Chessboard history \n -----------------");
-       for (i, entry) in self.history.iter().enumerate() {
-           println!("Entry {}: pieces={:?}, castling_ep={:#010b}", i, entry.pieces, entry.castling_en_passant);
-       }
-   }
 }
 
 /// helper: map piece (1..6) and color (WHITE/BLACK) to pieces[] index (0..11)
-pub fn piece_index(piece: u8, color: i8) -> Option<usize> {
+fn piece_index(piece: u8, color: i8) -> Option<usize> {
    // a lot of functions depend on this, so panic on invalid input
    if piece == 0 || piece > 6 {
        /*self.print_history();*/
@@ -403,114 +451,110 @@ pub struct ZobristTable {
 
 
 impl ZobristTable {
-   /// create a new Zobrist table with random values
-   pub fn new() -> Self {
-       //fixed seed, maybe make test to compare seeds
-       let mut rng = StdRng::seed_from_u64(69u64);
+    /// create a new Zobrist table with random values
+    pub fn new() -> Self {
+        //fixed seed, maybe make test to compare seeds
+        let mut rng = StdRng::seed_from_u64(69u64);
 
-       let mut piece_keys = [[[0u64; 64]; 2]; 6];
-       for piece in 0..6 {
-           for color in 0..2 {
-               for square in 0.. 64 {
-                   piece_keys[piece][color][square] = rng.random();
-               }
-           }
-       }
+        let mut piece_keys = [[[0u64; 64]; 2]; 6];
+        for piece in 0..6 {
+            for color in 0..2 {
+                for square in 0..64 {
+                    piece_keys[piece][color][square] = rng.random();
+                }
+            }
+        }
 
-       let side_to_move = rng.random();
+        let side_to_move = rng.random();
 
-       let mut castling_keys = [0u64; 4];
-       for i in 0..4 {
-           castling_keys[i] = rng.random();
-       }
+        let mut castling_keys = [0u64; 4];
+        for i in 0..4 {
+            castling_keys[i] = rng.random();
+        }
 
-       let mut en_passant_keys = [0u64; 16];
-       for i in 0..16 {
-           en_passant_keys[i] = rng.random();
-       }
+        let mut en_passant_keys = [0u64; 16];
+        for i in 0..16 {
+            en_passant_keys[i] = rng.random();
+        }
 
-       ZobristTable {
-           piece_keys,
-           side_to_move,
-           castling_keys,
-           en_passant_keys,
-       }
-   }
+        ZobristTable {
+            piece_keys,
+            side_to_move,
+            castling_keys,
+            en_passant_keys,
+        }
+    }
+
+    ///Compute the full Zobrist hash for a board position
+    pub fn hash(&self, board: &Chessboard, side_to_move: i8) -> u64 {
+        let mut hash = 0u64;
+
+        // Hash all pieces using existing bitboards
+        for piece_type in 1..=6u8 {  // PAWN=1 to KING=6
+            let piece_idx = (piece_type - 1) as usize;
+
+            // White pieces
+            let mut white_bb = board.get_piece_mask(piece_type, WHITE);
+            while white_bb != 0 {
+                let sq = white_bb.trailing_zeros() as usize;
+                hash ^= self.piece_keys[piece_idx][0][sq];
+                white_bb &= white_bb - 1;  // Clear LSB
+            }
+
+            // Black pieces
+            let mut black_bb = board.get_piece_mask(piece_type, BLACK);
+            while black_bb != 0 {
+                let sq = black_bb.trailing_zeros() as usize;
+                hash ^= self.piece_keys[piece_idx][1][sq];
+                black_bb &= black_bb - 1;
+            }
+        }
+
+        //side to move
+        if side_to_move == BLACK {
+            hash ^= self. side_to_move;
+        }
+
+        //castling rights (4-bit flags: bit 0 black KS, bit 1 black QS, bit 2 white KS, bit 3 white QS)
+        let castling = board.get_castling_rights();
+        for i in 0..4 {
+            if (castling >> i) & 1 != 0 {
+                hash ^= self.castling_keys[i];
+            }
+        }
+
+        //en passant (0 = none, otherwise a 4-bit square index)
+        let ep_data = board.get_en_passant();
+        if ep_data != 0 {
+            let square = ep_data as usize;
+            hash ^= self.en_passant_keys[square];
+        }
+
+        hash
+    }
+
+    /// Update hash when a piece moves
+    pub fn toggle_piece(&self, hash: &mut u64, piece_type: u8, color: i8, square: usize) {
+        let piece_idx = (piece_type - 1) as usize;
+        let color_idx = if color == WHITE { 0 } else { 1 };
+        *hash ^= self.piece_keys[piece_idx][color_idx][square];
+    }
+
+    /// Toggle side to move
+    pub fn toggle_side(&self, hash: &mut u64) {
+        *hash ^= self.side_to_move;
+    }
+
+    /// Toggle a castling right
+    pub fn toggle_castling(&self, hash: &mut u64, right_index: usize) {
+        *hash ^= self.castling_keys[right_index];
+    }
+
+    /// Toggle en passant square
+    pub fn toggle_en_passant(&self, hash:  &mut u64, square: usize) {
+        *hash ^= self.en_passant_keys[square];
+    }
 }
-
-impl ZobristTable {
-   ///Compute the full Zobrist hash for a board position
-   pub fn hash(&self, board: &Chessboard, side_to_move: i8) -> u64 {
-       let mut hash = 0u64;
-
-       // Hash all pieces using existing bitboards
-       for piece_type in 1..=6u8 {  // PAWN=1 to KING=6
-           let piece_idx = (piece_type - 1) as usize;
-
-           // White pieces
-           let mut white_bb = board.get_piece_mask(piece_type, WHITE);
-           while white_bb != 0 {
-               let sq = white_bb.trailing_zeros() as usize;
-               hash ^= self.piece_keys[piece_idx][0][sq];
-               white_bb &= white_bb - 1;  // Clear LSB
-           }
-
-           // Black pieces
-           let mut black_bb = board.get_piece_mask(piece_type, BLACK);
-           while black_bb != 0 {
-               let sq = black_bb.trailing_zeros() as usize;
-               hash ^= self.piece_keys[piece_idx][1][sq];
-               black_bb &= black_bb - 1;
-           }
-       }
-
-       //side to move
-       if side_to_move == BLACK {
-           hash ^= self. side_to_move;
-       }
-
-       //castling rights (from castling_en_passant byte, upper 4 bits)
-       let castling = board.get_castling_en_passant() >> 4;
-       for i in 0..4 {
-           if (castling >> i) & 1 != 0 {
-               hash ^= self.castling_keys[i];
-           }
-       }
-
-       //en passant file (lower 4 bits encode the file if active)
-       let ep_data = board.get_castling_en_passant() & 0x0F;
-       if ep_data != 0 {
-           // Square from the 0-15 square format
-           let square = ep_data as usize;
-           hash ^= self.en_passant_keys[square];
-       }
-
-       hash
-   }
-
-   /// Update hash when a piece moves
-   pub fn toggle_piece(&self, hash: &mut u64, piece_type: u8, color: i8, square: usize) {
-       let piece_idx = (piece_type - 1) as usize;
-       let color_idx = if color == WHITE { 0 } else { 1 };
-       *hash ^= self.piece_keys[piece_idx][color_idx][square];
-   }
-
-   /// Toggle side to move
-   pub fn toggle_side(&self, hash: &mut u64) {
-       *hash ^= self.side_to_move;
-   }
-
-   /// Toggle a castling right
-   pub fn toggle_castling(&self, hash: &mut u64, right_index: usize) {
-       *hash ^= self.castling_keys[right_index];
-   }
-
-   /// Toggle en passant square
-   pub fn toggle_en_passant(&self, hash:  &mut u64, square: usize) {
-       *hash ^= self.en_passant_keys[square];
-   }
-}
-
 
 // util function
 pub fn print_bitboard_as_chessboard(board: u64) {

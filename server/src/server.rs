@@ -72,6 +72,7 @@ fn page_routes() -> Router {
     Router::new()
         .route("/", get(welcome))
         .route("/play-engine", get(play_engine))
+        .route("/solo-game", get(solo_game))
 }
 
 async fn welcome() -> Html<String> {
@@ -79,13 +80,37 @@ async fn welcome() -> Html<String> {
 }
 
 async fn play_engine(jar: CookieJar) -> Response {
-    let body = read_static_file("static/play-engine.html");
+    let body = read_static_file("static/chessboard.html");
+    let common_script = read_static_file("static/js/chess-common.js");
+    let script = read_static_file("static/js/play-engine.js");
+    let body = format!("{}<script>{}</script><script>{}</script>", body, common_script, script);
 
     if jar.get("session_id").is_some() {
         return Html(body).into_response();
     }
 
     // No session cookie yet – create one and set it.
+    let session_id = format!("{}", Utc::now().timestamp());
+    let cookie = format!("session_id={}; Path=/; HttpOnly=false", session_id);
+
+    (
+        [("set-cookie", cookie)],
+        Html(body),
+    )
+        .into_response()
+}
+
+async fn solo_game(jar: CookieJar) -> Response {
+    let body = read_static_file("static/chessboard.html");
+    let common_script = read_static_file("static/js/chess-common.js");
+    let script = read_static_file("static/js/solo-game.js");
+    let body = format!("{}<script>{}</script><script>{}</script>", body, common_script, script);
+
+    if jar.get("session_id").is_some() {
+        return Html(body).into_response();
+    }
+
+    // No session cookie yet - create one and set it.
     let session_id = format!("{}", Utc::now().timestamp());
     let cookie = format!("session_id={}; Path=/; HttpOnly=false", session_id);
 
@@ -129,6 +154,15 @@ struct MovePieceQuery {
     from_y: u8,
     to_x: u8,
     to_y: u8,
+    special_move: Option<SpecialMoveHint>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum SpecialMoveHint {
+    Normal,
+    EnPassant,
+    Castling,
 }
 
 #[derive(Serialize)]
@@ -137,6 +171,7 @@ struct MoveJson {
     from_y: u8,
     to_x: u8,
     to_y: u8,
+    special_move: SpecialMoveHint,
 }
 
 #[derive(Serialize)]
@@ -220,6 +255,7 @@ async fn possible_moves(
             from_y: mv.get_from_y(),
             to_x: mv.get_to_x(),
             to_y: mv.get_to_y(),
+            special_move: move_to_special_move_hint(&mv),
         })
         .collect();
 
@@ -235,6 +271,7 @@ async fn move_piece(
     let from_y = params.from_y;
     let to_x = params.to_x;
     let to_y = params.to_y;
+    let special_move = params.special_move;
 
     let session_id = get_session_id(&jar);
 
@@ -253,12 +290,24 @@ async fn move_piece(
             .get_mut(&session_id)
             .expect("session not found");
 
-        session.make_move(Move::new_from_coordinates(
-            from_x,
-            from_y,
-            to_x,
-            to_y,
-        ));
+        let turn = session.get_turn();
+        let selected_move = generate_moves(&mut session.board, turn)
+            .into_iter()
+            .find(|mv| {
+                mv.get_from_x() == from_x
+                    && mv.get_from_y() == from_y
+                    && mv.get_to_x() == to_x
+                    && mv.get_to_y() == to_y
+                    && special_move
+                        .map(|hint| move_to_special_move_hint(mv) == hint)
+                        .unwrap_or(true)
+            });
+
+        let Some(selected_move) = selected_move else {
+            return axum::http::StatusCode::BAD_REQUEST;
+        };
+
+        session.make_move(selected_move);
 
         println!(
             "Sessions: {} | Session {} board:",
@@ -305,6 +354,7 @@ async fn make_engine_move(
         from_y: engine_move.get_from_y(),
         to_x: engine_move.get_to_x(),
         to_y: engine_move.get_to_y(),
+        special_move: move_to_special_move_hint(&engine_move),
     };
 
     // lock session again to move
@@ -321,15 +371,20 @@ async fn make_engine_move(
             .get_mut(&session_id)
             .expect("session not found");
 
-        session.make_move(Move::new_from_coordinates(
-            result.from_x,
-            result.from_y,
-            result.to_x,
-            result.to_y,
-        ));
+        session.make_move(engine_move);
     }
 
     Json(result)
+}
+
+fn move_to_special_move_hint(mv: &Move) -> SpecialMoveHint {
+    if mv.is_en_passant() {
+        SpecialMoveHint::EnPassant
+    } else if mv.is_castling() {
+        SpecialMoveHint::Castling
+    } else {
+        SpecialMoveHint::Normal
+    }
 }
 
 // Session helpers
