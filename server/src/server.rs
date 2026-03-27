@@ -81,8 +81,9 @@ async fn welcome() -> Html<String> {
 
 async fn play_engine(jar: CookieJar) -> Response {
     let body = read_static_file("static/chessboard.html");
+    let common_script = read_static_file("static/js/chess-common.js");
     let script = read_static_file("static/js/play-engine.js");
-    let body = format!("{}<script>{}</script>", body, script);
+    let body = format!("{}<script>{}</script><script>{}</script>", body, common_script, script);
 
     if jar.get("session_id").is_some() {
         return Html(body).into_response();
@@ -101,8 +102,9 @@ async fn play_engine(jar: CookieJar) -> Response {
 
 async fn solo_game(jar: CookieJar) -> Response {
     let body = read_static_file("static/chessboard.html");
+    let common_script = read_static_file("static/js/chess-common.js");
     let script = read_static_file("static/js/solo-game.js");
-    let body = format!("{}<script>{}</script>", body, script);
+    let body = format!("{}<script>{}</script><script>{}</script>", body, common_script, script);
 
     if jar.get("session_id").is_some() {
         return Html(body).into_response();

@@ -8,7 +8,7 @@ let isSubmittingMove = false;
 
 initialRequest(sessionId);
 async function initialRequest(sessionId) {
-    let data = await getSession(sessionId);
+    let data = await getSession(sessionId, "Could not get color");
     color = -data.opponent;
     populateBoard(sessionId);
 }
@@ -55,7 +55,7 @@ function populateBoard() {
                         const squareElement = rowElement.children[j];
                         console.log("squareElement has " + squareElement.children.length + " children");
                         if (piece_name !== "empty") {
-                            addPieceToSquare(squareElement, piece_name, j, i);
+                            addPieceToSquare(squareElement, piece_name, j, i, color, savedPossibleMoves, pieces, makeMove);
                         } else {
                             squareElement.children[0].innerHTML = "";
                         }
@@ -67,81 +67,6 @@ function populateBoard() {
         }
     });
 }
-
-
-function addPieceToSquare(squareElement, piece_name,x,y) {
-    const pieceElement = squareElement.children[0];
-    //if the piece element doesn't have a child, add one
-    if (pieceElement.children.length === 0) {
-        const pieceImg = document.createElement("img");
-        pieceElement.appendChild(pieceImg);
-    }
-    const pieceImg = pieceElement.children[0];
-    pieceImg.setAttribute("src", "./pieces/" + piece_name + ".png");
-    pieceImg.setAttribute("alt", piece_name);
-
-    let listenerFunction = null;
-    //add event listener to piece if it's the player's color
-    if (color === 1 && piece_name.startsWith("white") || color === -1 && piece_name.startsWith("black")) {
-        listenerFunction = addListenerToPiece(pieceImg, piece_name, x, y);
-    }
-    pieces.push({
-        location: [x, y],
-        piece: piece_name,
-        element: pieceImg,
-        listenerFunction: listenerFunction,
-    })
-}
-function addListenerToPiece(pieceImg, piece_name, x, y) {
-    let listenerFunction = async function () {
-        if (savedPossibleMoves.length > 0) {
-            //remove all possible move squares
-            removePossibleMoves();
-            return;
-        }
-        console.log("Clicked on piece " + piece_name + " at " + x + ", " + y);
-        let queries = [
-            ["x", 7 - x],
-            ["y", 7 - y],
-            ["color", color],
-        ];
-        await fetch("/api/possible-moves" + "?" + new URLSearchParams(queries), {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            credentials: "include",
-        }).then((response) => {
-            if (response.status === 200) {
-                response.json().then((data) => {
-                    let possibleMoves = data.moves;
-                    for (let i = 0; i < possibleMoves.length; i++) {
-                        const toX = 7 - possibleMoves[i].to_x;
-                        const toY = 7 - possibleMoves[i].to_y;
-                        const toSquare = document.getElementById("row" + toY).children[toX];
-                        console.log("Possible move added")
-                        toSquare.classList.add("possible-move");
-                        const specialMove = possibleMoves[i].special_move;
-                        let possibleMoveListener = function () {
-                            makeMove(x, y, toX, toY, specialMove);
-                        };
-                        toSquare.addEventListener("click", possibleMoveListener, {once: true});
-                        savedPossibleMoves.push({
-                            location: [toX, toY],
-                            specialMove: specialMove,
-                            listenerFunction: possibleMoveListener,
-                        });
-                    }
-                });
-            } else {
-                alert("Could not get possible moves");
-            }
-        });
-    };
-    pieceImg.addEventListener("click", listenerFunction);
-    return listenerFunction;
-}
-
 function makeMove(x, y, toX, toY, specialMove) {
     if (isSubmittingMove) {
         return;
@@ -221,15 +146,15 @@ function movePiece(x, y, toX, toY, specialMove = "normal") {
     //add event listener to piece if it's the player's color
     const pieceColor = pieceElement.getAttribute("alt").startsWith("white") ? 1 : -1;
     if (pieceColor === color) {
-        addListenerToPiece(pieceElement, pieceElement.getAttribute("alt"), toX, toY);
+        addListenerToPiece(pieceElement, pieceElement.getAttribute("alt"), toX, toY, color, savedPossibleMoves, makeMove);
     }
-    removePossibleMoves();
+    removePossibleMoves(savedPossibleMoves);
 }
 const frozenSquares = [];
 
 function freezeBoard() {
     //this method should freeze the board, so that the player can't move any pieces
-    removePossibleMoves();
+    removePossibleMoves(savedPossibleMoves);
     frozenSquares.length = 0;
     //loop through all squares and remove event listeners from own pieces
     for (let i = 0; i < pieces.length; i++) {
@@ -282,57 +207,4 @@ function makeEngineMove() {
         isSubmittingMove = false;
         alert("Could not make engine move");
     });
-}
-function removePossibleMoves() {
-    console.log("Removing possible moves: " + savedPossibleMoves.length);
-    for(let i = savedPossibleMoves.length - 1; i >= 0; i--){
-        const move = savedPossibleMoves[i].location;
-        const square = document.getElementById("row" + move[1]).children[move[0]];
-        square.classList.remove("possible-move");
-        square.removeEventListener("click", savedPossibleMoves[i].listenerFunction, {once: true});
-        //remove from savedPossibleMoves
-        savedPossibleMoves.splice(i, 1);
-        console.log("Removed possible move index " + i);
-    }
-}
-
-
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';'); //split cookies by ;
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim(); //trim spaces
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) === (name + '=')) { //if cookie name is found
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); //get cookie value
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-async function getSession(sessionID) {
-    let data;
-    await fetch("/api/get-session", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
-    }).then(async (response) => {
-        console.log(response)
-        if (response.status === 200) {
-            await response.json().then((raw) => {
-                console.log(raw)
-                data = raw;
-            });
-        } else {
-            alert("Could not get color");
-        }
-    });
-    console.log(data)
-    return data;
 }

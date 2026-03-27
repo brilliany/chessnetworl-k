@@ -207,41 +207,42 @@ impl Chessboard {
         let old_castling = self.castling_rights;
         let mut new_castling = old_castling;
 
-        // White King moved (e1)
-        if (from & (1u64 << 4)) != 0 {
-            new_castling &= !0b1100;
+        // White King moved (d1 in this board setup)
+        if (from & (1u64 << 3)) != 0 {
+            new_castling &= !WHITE_QUEENSIDE_CASTLE; // White queenside
+            new_castling &= !WHITE_KINGSIDE_CASTLE;  // White kingside
         }
-        // Black King moved (e8)
-        if (from & (1u64 << 60)) != 0 {
-            new_castling &= !0b0011;
+        // Black King moved (d8 in this board setup)
+        if (from & (1u64 << 59)) != 0 {
+            new_castling &= !BLACK_QUEENSIDE_CASTLE; // Black queenside
+            new_castling &= !BLACK_KINGSIDE_CASTLE;  // Black kingside
         }
 
         // Check if rooks are moved or captured (a1, h1, a8, h8)
 
-        // White Queenside Rook (a1)
-        if (from & 1u64) != 0 || (to & 1u64) != 0 {
-            new_castling &= !0b1000;
-        }
-        // White Kingside Rook (h1)
         if (from & (1u64 << 7)) != 0 || (to & (1u64 << 7)) != 0 {
-            new_castling &= !0b0100;
+            new_castling &= !WHITE_QUEENSIDE_CASTLE; // White queenside
         }
-        // Black Queenside Rook (a8)
-        if (from & (1u64 << 56)) != 0 || (to & (1u64 << 56)) != 0 {
-            new_castling &= !0b0010;
+        if (from & (1u64 << 0)) != 0 || (to & (1u64 << 0)) != 0 {
+            new_castling &= !WHITE_KINGSIDE_CASTLE; // White kingside
         }
-        // Black Kingside Rook (h8)
         if (from & (1u64 << 63)) != 0 || (to & (1u64 << 63)) != 0 {
-            new_castling &= !0b0001;
+            new_castling &= !BLACK_QUEENSIDE_CASTLE; // Black queenside
+        }
+        if (from & (1u64 << 56)) != 0 || (to & (1u64 << 56)) != 0 {
+            new_castling &= !BLACK_KINGSIDE_CASTLE; // Black kingside
         }
 
         if new_castling != old_castling {
-             for i in 0..4 {
-                if ((old_castling >> i) & 1) != ((new_castling >> i) & 1) {
+            // Update Zobrist hash for castling rights
+            for i in 0..4 {
+                let old_bit = (old_castling >> i) & 1;
+                let new_bit = (new_castling >> i) & 1;
+                if old_bit != new_bit {
                     zobrist.toggle_castling(&mut self.zobrist_hash, i);
                 }
-             }
-             self.castling_rights = new_castling;
+            }
+            self.castling_rights = new_castling;
         }
     }
 
@@ -249,7 +250,6 @@ impl Chessboard {
      Move a piece from one square to another ONLY ON THE PIECE'S OWN BITBOARD
      The move_piece and remove_piece functions assume that the move is valid and legal
     */
-   //todo promotion
    fn move_piece(&mut self, piece: u8, color: i8, mv: &Move, zobrist: &ZobristTable) {
        let from = mv.get_from_mask();
        let to = mv.get_to_mask();
@@ -289,6 +289,28 @@ impl Chessboard {
                    self.black_pieces &= !rook_from;
                    self.black_pieces |= rook_to;
                }
+           }
+           MoveType::Promotion { promoted_piece } => {
+               // Remove the pawn from its original square
+               self.pieces[array_index] &= !from;
+
+               // Add the promoted piece to the destination square
+               let promo_index = piece_index(promoted_piece, color).unwrap();
+               self.pieces[promo_index] |= to;
+
+               // Update color occupancy for the promotion
+               if color == WHITE {
+                   self.white_pieces &= !from; // Remove pawn
+                   self.white_pieces |= to;    // Add promoted piece
+               } else {
+                   self.black_pieces &= !from; // Remove pawn
+                   self.black_pieces |= to;    // Add promoted piece
+               }
+
+               // Update Zobrist hash: toggle out the pawn and toggle in the promoted piece
+               zobrist.toggle_piece(&mut self.zobrist_hash, PAWN, color, from_sq);
+               zobrist.toggle_piece(&mut self.zobrist_hash, promoted_piece, color, to_sq);
+               return; // Promotion is a special case, so we return early after handling it
            }
        }
 

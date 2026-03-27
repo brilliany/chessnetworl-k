@@ -75,10 +75,10 @@ impl Heuristics {
     pub fn castling(&self) -> i32 {
         let mut score: i32 = 0;
         if self.color == WHITE {
-            let white_king_short: u64 = self.white_kings & (1 << 6);
-            let white_rook_short: u64 = self.white_rooks & (1 << 5);
-            let white_king_long: u64 = self.white_kings & (1 << 2);
-            let white_rook_long: u64 = self.white_rooks & (1 << 3);
+            let white_king_long: u64 = self.white_kings & (1 << 6);
+            let white_rook_long: u64 = self.white_rooks & (1 << 5);
+            let white_king_short: u64 = self.white_kings & (1 << 1);
+            let white_rook_short: u64 = self.white_rooks & (1 << 2);
             if white_king_short != 0 && white_rook_short != 0 {
                 score += CASTLING_SCORE;
             }
@@ -86,10 +86,10 @@ impl Heuristics {
                 score += CASTLING_SCORE;
             }
         } else {
-            let black_king_short: u64 = self.black_kings & (1 << 62);
-            let black_rook_short: u64 = self.black_rooks & (1 << 61);
-            let black_king_long: u64 = self.black_kings & (1 << 58);
-            let black_rook_long: u64 = self.black_rooks & (1 << 59);
+            let black_king_long: u64 = self.black_kings & (1 << 61);
+            let black_rook_long: u64 = self.black_rooks & (1 << 60);
+            let black_king_short: u64 = self.black_kings & (1 << 57);
+            let black_rook_short: u64 = self.black_rooks & (1 << 58);
             if black_king_short != 0 && black_rook_short != 0 {
                 score += CASTLING_SCORE;
             }

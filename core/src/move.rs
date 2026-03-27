@@ -10,7 +10,8 @@ pub enum MoveType {
     EnPassant { captured_square: u64 },
     /// Castling. rook_from and rook_to is a rook move 
     Castling { rook_from: u64, rook_to: u64 },
-    // Future: Promotion { promote_to: u8 },
+    // Promotion. promoted_piece is the piece type the pawn is promoted to
+    Promotion { promoted_piece: u8 },
 }
 
 /// from_mask and to_mask are u64s with the relevant bit flipped to a 1, they are stored this way
@@ -43,6 +44,14 @@ impl Move {
             from_mask,
             to_mask,
             kind: MoveType::Castling { rook_from, rook_to },
+        }
+    }
+
+    pub fn promotion(from_mask: u64, to_mask: u64, promoted_piece: u8) -> Move {
+        Move {
+            from_mask,
+            to_mask,
+            kind: MoveType::Promotion { promoted_piece },
         }
     }
     
