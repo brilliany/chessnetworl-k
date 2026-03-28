@@ -443,6 +443,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "chessnetwork-tuning"
+version = "0.1.0"
+
+[[package]]
 name = "chessnetworl-k"
 version = "0.1.0"
 
