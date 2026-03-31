@@ -184,7 +184,6 @@ impl Chessboard {
 
        // Toggle side to move
        zobrist.toggle_side(&mut self.zobrist_hash);
-
    }
 
     fn assign_en_passant(&mut self, from: u64, to: u64, piece_type: u8, color: i8, zobrist: &ZobristTable) {

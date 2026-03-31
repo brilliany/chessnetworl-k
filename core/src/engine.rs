@@ -20,18 +20,13 @@ use crate::{BLACK, EMPTY, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
-use crate::heuristics::Heuristics;
+use crate::heuristics::{Heuristics, HeuristicParams};
 
-//was stupidly set to i32:MIN which made it underflow in places where we needed it to go lower
-//now just arbitrary low number that scores will never reach
 const MIN_SCORE: i32 = -100_000;
 const MAX_SCORE: i32 = 100_000;
 
-//todo maybe store scoring parameters in a config?
 
-//todo maybe add this to config
-// 30 seconds time cutoff in ms for search mode
-const TIME_CUTOFF: u64 = 30000;
+const TIME_CUTOFF: u64 = 200;
 
 #[derive(Clone)]
 pub struct Engine {
@@ -39,130 +34,93 @@ pub struct Engine {
     color: i8,
     transposition_table: TranspositionTable,
     killer_moves: HashMap<Move, i32>,
+    pub heuristics: HeuristicParams,
 }
 
 impl Engine {
-    pub fn new_single(depth: i32, color: i8) -> Self {
-        let transposition_table = TranspositionTable::new(2048);
-        let killer_moves = HashMap::with_capacity(10_000);
+    pub fn new_single(depth: i32, color: i8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
+        // Use all available memory specifically for the transposition table
+        // We'll avoid allocating massive exact capacities for HashMaps to prevent extreme OS mappings
+        // that cause OOM exceptions and fragmentation.
+        let tt_memory = available_memory_mb;
+
+        let transposition_table = TranspositionTable::new(tt_memory.max(1));
+
+        let killer_moves = HashMap::new();
         Engine {
             depth,
             color,
             transposition_table,
             killer_moves,
+            heuristics,
         }
     }
 
     pub fn get_best_move(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
-        Some(self.start_single_search(chessboard))
+        self.start_single_search(chessboard)
     }
 
-
-    fn start_single_search(&mut self, chessboard: &mut Chessboard) -> Move {
+    fn start_single_search(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
         let start = std::time::Instant::now();
 
         let mut moves = generate_moves(chessboard, self.color);
-        println!("{} moves available for engine", moves.len());
+        // println!("{} moves available for engine", moves.len());
         if moves.is_empty() {
-            panic!("No moves available");
+            return None;
         }
 
         let mut best_move: Option<Move> = None;
         let mut best_score = MIN_SCORE;
 
-
         let mut last_time = 0u64;
         // Iterative deepening loop
         for current_depth in 1..=self.depth {
-            //time
-            let start_time = std::time::Instant::now();
-
-            //move ordering
-            moves.sort_by_cached_key(|m| {
-                -(if let Some(entry) = self.transposition_table.get(chessboard.get_hash()) {
-                    if let Some(tt_move) = entry.best_move {
-                        if *m == tt_move { 1000 } else { 0 }
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                })
-            });
-
-            // Time per depth-unit on average increases almost exponentially, so we can use this to estimate the time for the next depth and stop if we exceed the time limit
-            if current_depth > 1 {
-                let estimated_time = last_time * (current_depth as u64) * 2;
-                if estimated_time > TIME_CUTOFF {
-                    println!("Time cutoff reached, stopping search at depth {}", current_depth - 1);
-                    break;
-                }
+            if start.elapsed().as_millis() as u64 > TIME_CUTOFF {
+                // println!("Time cutoff reached, stopping search at depth {}", current_depth);
+                break; // Basic time management
             }
 
-            let mut alpha = MIN_SCORE;
-            let beta = MAX_SCORE;
-
-            let mut depth_best_move = None;
-            let mut depth_best_score = MIN_SCORE;
-
-            for mv in &moves {
-                chessboard.make_move(*mv);
-                let result = alpha_beta(
-                    current_depth - 1,
-                    alpha,
-                    beta,
-                    -self.color,
-                    false,
-                    chessboard,
-                    &mut self.transposition_table,
-                    &mut self.killer_moves,
-                );
-                chessboard.undo_move();
-                if result.score > depth_best_score {
-                    depth_best_score = result.score;
-                    depth_best_move = Some(*mv);
-                }
-
-                // Fail-hard beta cutoff
-                if depth_best_score >= beta {
-                    break;
-                }
-
-                // Improve alpha
-                if depth_best_score > alpha {
-                    alpha = depth_best_score;
-                }
-            }
-
-            if let Some(m) = depth_best_move {
-                best_move = Some(m);
-                best_score = depth_best_score;
-            }
-
-            println!(
-                "Depth {} finished: best move {} to {}, score {}, elapsed {:?}, transposition table size {}MB",
+            let result = alpha_beta(
                 current_depth,
-                best_move.unwrap().get_from_mask().trailing_zeros(),
-                best_move.unwrap().get_to_mask().trailing_zeros(),
-                best_score,
-                start.elapsed(),
-                std::mem::size_of::<Option<Entry>>()*self.transposition_table.size / (1024*1024)
+                MIN_SCORE,
+                MAX_SCORE,
+                self.color,
+                true,
+                chessboard,
+                &mut self.transposition_table,
+                &mut self.killer_moves,
+                &self.heuristics,
+                &start
             );
-            last_time = start_time.elapsed().as_millis() as u64;
+
+            // If we timed out inside alpha_beta or didn't get a result, don't overwrite best_move
+            if start.elapsed().as_millis() as u64 > TIME_CUTOFF {
+                if best_move.is_none() && result.best_move.is_some() {
+                    best_move = result.best_move;
+                }
+                break;
+            }
+
+            if result.best_move.is_some() {
+                best_move = result.best_move;
+            } else if best_move.is_none() && !moves.is_empty() {
+                // Fallback to first available move if alpha-beta returns none
+                best_move = Some(moves[0]);
+            }
+            best_score = result.score;
+
+            last_time = start.elapsed().as_millis() as u64;
         }
 
-        best_move.expect("No best move found")
+        best_move
     }
 }
 
-
-
-
 // go to the wikipedia page if you want to understand this
-fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>) -> Result {
+fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>, heuristics_params: &HeuristicParams, start_time: &std::time::Instant) -> Result {
     if depth == 0 {
         let eval_color = if maximizing_player { color } else { -color };
-        let score = evaluate(chessboard, eval_color);
+        let score = evaluate(chessboard, eval_color, heuristics_params);
         /*println!("Reached end of depth");
            chessboard.print_board();*/
         return Result::new(score, None);
@@ -198,8 +156,13 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
         }
     });
     for mov in moves {
+        // Enforce time abort during deep branches
+        if start_time.elapsed().as_millis() as u64 > TIME_CUTOFF {
+            return Result::new(if maximizing_player { MIN_SCORE } else { MAX_SCORE }, None);
+        }
+
         chessboard.make_move(mov);
-        let result = alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, transposition_table, killer_moves);
+        let result = alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, transposition_table, killer_moves, heuristics_params, start_time);
         chessboard.undo_move();
         let score = result.score;
         if maximizing_player && score > best_score {
@@ -247,20 +210,20 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
         bound_type});
     Result::new(best_score, best_move)
 }
-pub fn evaluate(position: &Chessboard, color: i8) -> i32 {
+pub fn evaluate(position: &Chessboard, color: i8, params: &HeuristicParams) -> i32 {
     let mut score = 0;
     score += material(position, color);
-    score += heuristics(position, color);
+    score += evaluate_heuristics(position, color, params);
     score
 }
-pub fn heuristics(position: &Chessboard, color: i8) -> i32 {
+pub fn evaluate_heuristics(position: &Chessboard, color: i8, h: &HeuristicParams) -> i32 {
     let mut score: i32 = 0;
-    let heuristics = Heuristics::new(position, color);
-    score += heuristics.two_middle_pawns();
-    score += heuristics.castling();
-    score += heuristics.knight_outpost();
-    score += heuristics.development();
-    score += heuristics.mobility();
+    let heuristics_eval = Heuristics::new(position, color);
+    score += heuristics_eval.two_middle_pawns() * h.two_middle_pawns_weight;
+    score += heuristics_eval.castling() * h.castling_weight;
+    score += heuristics_eval.knight_outpost() * h.knight_outpost_weight;
+    score += heuristics_eval.development() * h.development_weight;
+    score += heuristics_eval.mobility() * h.mobility_weight;
     score
 }
 pub fn material(position: &Chessboard, for_color: i8) -> i32 {

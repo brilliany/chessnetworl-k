@@ -1,4 +1,5 @@
 /target
 /.idea/
 chessnetworl-k.iml
-/.github
+/.github/
+/results/

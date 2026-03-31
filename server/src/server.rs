@@ -328,7 +328,7 @@ async fn make_engine_move(
 
     // lock session to get board
     let mut board = {
-        let sessions = match state.sessions.lock() {
+        let mut sessions = match state.sessions.lock() {
             Ok(s) => s,
             Err(poisoned) => {
                 eprintln!("Thread panicked while making engine move for session {}, recovering...", session_id);
@@ -336,17 +336,15 @@ async fn make_engine_move(
             }
         };
 
-        let session = sessions
-            .get(&session_id)
-            .expect("session not found");
-
-        println!("Engine making move for session {}", session.id);
+        let session = sessions.get_mut(&session_id).unwrap();
         session.board.clone()
     };
 
     // run engine without lock to not block requests
     board.print_board();
-    let mut engine = Engine::new_single(60, BLACK);
+    let heuristics = chessnetwork_core::load_heuristics_from_config("config.yml");
+    let available_memory = chessnetwork_core::load_available_memory_from_config("config.yml");
+    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory);
     let engine_move = engine.get_best_move(&mut board).unwrap();
 
     let result = MoveJson {
