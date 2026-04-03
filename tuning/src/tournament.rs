@@ -1,6 +1,6 @@
 use crate::variant::EngineVariant;
 use crate::config::TuningConfig;
-use chessnetwork_core::{Chessboard, Engine, WHITE, BLACK};
+use chessnetwork_core::{Chessboard, Engine};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 
@@ -106,8 +106,8 @@ impl Tournament {
         let active_threads = rayon::current_num_threads().max(1);
         let memory_per_engine = (self.config.available_memory / (active_threads * 2)).max(1);
 
-        let mut white_engine = Engine::new_single(self.config.search_depth, chessnetwork_core::WHITE, (&white_variant.params).into(), memory_per_engine);
-        let mut black_engine = Engine::new_single(self.config.search_depth, chessnetwork_core::BLACK, (&black_variant.params).into(), memory_per_engine);
+        let mut white_engine = Engine::new_single(self.config.search_depth, chessnetwork_core::WHITE, (&white_variant.params).into(), memory_per_engine, false);
+        let mut black_engine = Engine::new_single(self.config.search_depth, chessnetwork_core::BLACK, (&black_variant.params).into(), memory_per_engine, false);
 
         let mut game_ended = false;
         let mut white_won = false;

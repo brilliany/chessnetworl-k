@@ -2,11 +2,12 @@ mode: "HttpServerSingle"
 http_server_address: "127.0.0.1"
 http_server_port: "3333"
 
-available_memory: 20
+available_memory: 20480
+benchmarking: true
 
 heuristics:
-  two_middle_pawns_weight: 31
-  castling_weight: 38
-  knight_outpost_weight: 21
-  development_weight: 39
-  mobility_weight: 39
+  two_middle_pawns_weight: 3
+  castling_weight: 4
+  knight_outpost_weight: 2
+  development_weight: 4
+  mobility_weight: 4

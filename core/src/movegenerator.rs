@@ -277,7 +277,7 @@ pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
 
 pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
     // if queen_mask is Some, use that as the bishop mask, otherwise use the bishops from the chessboard
-    let mut bishop_mask = if let Some(q_mask) = queen_mask {
+    let mut bishop_mask = if let Some(_) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(BISHOP, WHITE).clone()
@@ -342,7 +342,7 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
 
 // same logic as bishop but for straight lines
 pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
-    let mut rook_mask = if let Some(q_mask) = queen_mask {
+    let mut rook_mask = if let Some(_) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(ROOK, WHITE)
@@ -546,6 +546,109 @@ pub fn is_square_attacked(chessboard: &Chessboard, square_mask: u64, attacker_co
     false
 }
 
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    fn sq(file: u8, rank: u8) -> u64 {
+        1u64 << (file + rank * 8)
+    }
+
+    fn benchmark_board() -> Chessboard {
+        let mut board = Chessboard::default();
+
+        board.init();
+
+        board
+    }
+
+    fn average_ns<F>(iterations: usize, mut step: F) -> u128
+    where
+        F: FnMut(),
+    {
+        let mut total_ns = 0u128;
+        for _ in 0..iterations {
+            let start = Instant::now();
+            step();
+            total_ns += start.elapsed().as_nanos();
+        }
+
+        total_ns / iterations as u128
+    }
+
+    fn benchmark_color(label: &str, color: i8, board: &mut Chessboard, iterations: usize) {
+        let mut pawn_moves = Vec::new();
+        let mut knight_moves = Vec::new();
+        let mut bishop_moves = Vec::new();
+        let mut rook_moves = Vec::new();
+        let mut queen_moves = Vec::new();
+        let mut king_moves = Vec::new();
+
+        let reference_moves = generate_moves(board, color);
+        assert!(!reference_moves.is_empty(), "benchmark board should produce moves for {label}");
+        let reference_len = reference_moves.len();
+
+        let pawn_avg = average_ns(iterations, || {
+            pawn_moves.clear();
+            get_pawn_moves(board, color, &mut pawn_moves);
+            black_box(pawn_moves.len());
+        });
+        let knight_avg = average_ns(iterations, || {
+            knight_moves.clear();
+            get_knight_moves(board, color, &mut knight_moves);
+            black_box(knight_moves.len());
+        });
+        let bishop_avg = average_ns(iterations, || {
+            bishop_moves.clear();
+            get_bishop_moves(board, color, &mut bishop_moves, None);
+            black_box(bishop_moves.len());
+        });
+        let rook_avg = average_ns(iterations, || {
+            rook_moves.clear();
+            get_rook_moves(board, color, &mut rook_moves, None);
+            black_box(rook_moves.len());
+        });
+        let queen_avg = average_ns(iterations, || {
+            queen_moves.clear();
+            get_queen_moves(board, color, &mut queen_moves);
+            black_box(queen_moves.len());
+        });
+        let king_avg = average_ns(iterations, || {
+            king_moves.clear();
+            get_king_moves(board, color, &mut king_moves);
+            black_box(king_moves.len());
+        });
+        let legal_avg = average_ns(iterations, || {
+            let moves = generate_moves(board, color);
+            black_box(moves.len());
+        });
+
+        let result = generate_moves(board, color);
+        assert_eq!(result.len(), reference_len, "benchmarking should not change board state for {label}");
+
+        println!("\n=== movegenerator benchmark: {label} ===");
+        println!("  pawn moves:    {:>10.3} µs", pawn_avg as f64 / 1_000.0);
+        println!("  knight moves:  {:>10.3} µs", knight_avg as f64 / 1_000.0);
+        println!("  bishop moves:  {:>10.3} µs", bishop_avg as f64 / 1_000.0);
+        println!("  rook moves:    {:>10.3} µs", rook_avg as f64 / 1_000.0);
+        println!("  queen moves:   {:>10.3} µs", queen_avg as f64 / 1_000.0);
+        println!("  king moves:    {:>10.3} µs", king_avg as f64 / 1_000.0);
+        println!("  legal filter:  {:>10.3} µs", legal_avg as f64 / 1_000.0);
+    }
+
+    #[test]
+    #[ignore = "benchmark-style timing test; run with cargo test -- --ignored --nocapture"]
+    fn benchmark_movegenerator() {
+        let iterations = 2000;
+        let mut board = benchmark_board();
+        benchmark_color("white", WHITE, &mut board, iterations);
+        benchmark_color("black", BLACK, &mut board, iterations);
+    }
+}
 
 
 

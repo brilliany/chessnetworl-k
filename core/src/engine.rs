@@ -12,11 +12,9 @@ use crate::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
         - Depth limit, position will be received from the controller
 */
 
-use std::sync::{mpsc, Arc, Mutex, MutexGuard};
-use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use crate::chessboard::Chessboard;
-use crate::{BLACK, EMPTY, WHITE};
+use crate::{BLACK, WHITE};
 use crate::engine::BoundType::{LowerBound, UpperBound};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
@@ -26,7 +24,7 @@ const MIN_SCORE: i32 = -100_000;
 const MAX_SCORE: i32 = 100_000;
 
 
-const TIME_CUTOFF: u64 = 200;
+const TIME_CUTOFF: u64 = 2000;
 
 #[derive(Clone)]
 pub struct Engine {
@@ -34,14 +32,12 @@ pub struct Engine {
     color: i8,
     transposition_table: TranspositionTable,
     killer_moves: HashMap<Move, i32>,
-    pub heuristics: HeuristicParams,
+    heuristics: HeuristicParams,
+    benchmarking: bool,
 }
 
 impl Engine {
-    pub fn new_single(depth: i32, color: i8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
-        // Use all available memory specifically for the transposition table
-        // We'll avoid allocating massive exact capacities for HashMaps to prevent extreme OS mappings
-        // that cause OOM exceptions and fragmentation.
+    pub fn new_single(depth: i32, color: i8, heuristics: HeuristicParams, available_memory_mb: usize, benchmarking: bool) -> Self {
         let tt_memory = available_memory_mb;
 
         let transposition_table = TranspositionTable::new(tt_memory.max(1));
@@ -53,6 +49,7 @@ impl Engine {
             transposition_table,
             killer_moves,
             heuristics,
+            benchmarking,
         }
     }
 
@@ -61,7 +58,8 @@ impl Engine {
     }
 
     fn start_single_search(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
+        let mut benchmark_stats = BenchmarkStats::default();
 
         let mut moves = generate_moves(chessboard, self.color);
         // println!("{} moves available for engine", moves.len());
@@ -76,7 +74,7 @@ impl Engine {
         // Iterative deepening loop
         for current_depth in 1..=self.depth {
             if start.elapsed().as_millis() as u64 > TIME_CUTOFF {
-                // println!("Time cutoff reached, stopping search at depth {}", current_depth);
+                println!("Time cutoff reached, stopping search at depth {}", current_depth);
                 break; // Basic time management
             }
 
@@ -90,7 +88,9 @@ impl Engine {
                 &mut self.transposition_table,
                 &mut self.killer_moves,
                 &self.heuristics,
-                &start
+                &start,
+                self.benchmarking,
+                &mut benchmark_stats,
             );
 
             // If we timed out inside alpha_beta or didn't get a result, don't overwrite best_move
@@ -110,24 +110,51 @@ impl Engine {
             best_score = result.score;
 
             last_time = start.elapsed().as_millis() as u64;
+
+            println!("Depth: {}, Score: {}, Time: {}ms", current_depth, best_score, last_time);
         }
 
+        if self.benchmarking {
+            benchmark_stats.print_averages();
+        }
+
+        println!("Score: {}, Time: {}ms", best_score, last_time);
         best_move
     }
 }
 
 // go to the wikipedia page if you want to understand this
-fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>, heuristics_params: &HeuristicParams, start_time: &std::time::Instant) -> Result {
+fn alpha_beta(
+    depth: i32,
+    mut alpha: i32,
+    mut beta: i32,
+    color: i8,
+    maximizing_player: bool,
+    chessboard: &mut Chessboard,
+    transposition_table: &mut TranspositionTable,
+    killer_moves: &mut HashMap<Move, i32>,
+    heuristics_params: &HeuristicParams,
+    start_time: &Instant,
+    benchmarking: bool,
+    benchmark_stats: &mut BenchmarkStats) -> Result {
+
     if depth == 0 {
+        let step_start = Instant::now();
         let eval_color = if maximizing_player { color } else { -color };
         let score = evaluate(chessboard, eval_color, heuristics_params);
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::DepthZeroEval, step_start.elapsed());
         /*println!("Reached end of depth");
            chessboard.print_board();*/
         return Result::new(score, None);
     }
+
+    let step_start = Instant::now();
     let board_key: u64 = chessboard.get_hash();
+    record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::BoardHash, step_start.elapsed());
     // Check transposition table
+    let step_start = Instant::now();
     if let Some(entry) = transposition_table.get(board_key) {
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::TranspositionLookup, step_start.elapsed());
         if entry.depth >= depth {
             // Return the stored result if the depth matches or is greater
             match entry.bound_type {
@@ -140,14 +167,22 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
                 return Result::new(entry.score, entry.best_move);
             }
         }
+    } else {
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::TranspositionLookup, step_start.elapsed());
     }
     let mut best_score = if maximizing_player { MIN_SCORE } else { MAX_SCORE };
     let mut best_move = None;
+    let step_start = Instant::now();
     let mut moves = generate_moves(chessboard, color);
+    record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::MoveGeneration, step_start.elapsed());
+    let step_start = Instant::now();
     if moves.len() == 0 {
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::EmptyMoveCheck, step_start.elapsed());
         return Result::new(if maximizing_player { MIN_SCORE } else { MAX_SCORE }, None);
     }
-    // Order moves based on scores (e.g., killer moves, history heuristics)
+    record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::EmptyMoveCheck, step_start.elapsed());
+    // Order moves based on killer moves
+    let step_start = Instant::now();
     moves.sort_by_cached_key(|mv| {
         if let Some(score) = killer_moves.get(mv) {
             -*score // Prefer killer moves (higher scores first)
@@ -155,21 +190,46 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
             0 // Default score for icons moves
         }
     });
+    record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::MoveOrdering, step_start.elapsed());
     for mov in moves {
-        // Enforce time abort during deep branches
+        // time cutoff
+        let step_start = Instant::now();
         if start_time.elapsed().as_millis() as u64 > TIME_CUTOFF {
+            record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::TimeCutoffCheck, step_start.elapsed());
             return Result::new(if maximizing_player { MIN_SCORE } else { MAX_SCORE }, None);
         }
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::TimeCutoffCheck, step_start.elapsed());
 
+        let step_start = Instant::now();
         chessboard.make_move(mov);
-        let result = alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, transposition_table, killer_moves, heuristics_params, start_time);
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::MakeMove, step_start.elapsed());
+        let result = alpha_beta(
+            depth - 1,
+            alpha,
+            beta,
+            -color,
+            !maximizing_player,
+            chessboard,
+            transposition_table,
+            killer_moves,
+            heuristics_params,
+            start_time,
+            benchmarking,
+            benchmark_stats,
+        );
+        let step_start = Instant::now();
         chessboard.undo_move();
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::UndoMove, step_start.elapsed());
+
+        let step_start = Instant::now();
         let score = result.score;
+        let mut cutoff_triggered = false;
         if maximizing_player && score > best_score {
             best_move = Some(mov);
             best_score = score;
             alpha = std::cmp::max(alpha, score);
             if beta <= alpha {
+                let cutoff_start = Instant::now();
                 transposition_table.insert(Entry {
                     hash: board_key,
                     score: best_score,
@@ -178,13 +238,15 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
                     bound_type: LowerBound});
                 //if we caused a cutoff, add this move to killer moves so that we skip the branch as soon as possible if we find it again
                 killer_moves.insert(best_move.unwrap(), best_score);
-                break;
+                record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::CutoffStorage, cutoff_start.elapsed());
+                cutoff_triggered = true;
             }
         } else if !maximizing_player && score < best_score {
             best_move = Some(mov);
             best_score = score;
             beta = std::cmp::min(beta, score);
             if beta <= alpha {
+                let cutoff_start = Instant::now();
                 transposition_table.insert(Entry {
                     hash: board_key,
                     score: best_score,
@@ -192,22 +254,28 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
                     best_move,
                     bound_type: UpperBound});
                 killer_moves.insert(best_move.unwrap(), best_score);
-                break;
+                record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::CutoffStorage, cutoff_start.elapsed());
+                cutoff_triggered = true;
             }
         }
+        record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::ScoreUpdate, step_start.elapsed());
+        if cutoff_triggered {
+            break;
+        }
     }
-    let bound_type;
-    if best_score <= alpha {
-        bound_type = UpperBound;
+    let step_start = Instant::now();
+    let bound_type = if best_score <= alpha {
+        UpperBound
     } else {
-        bound_type = LowerBound;
-    }
+        LowerBound
+    };
     transposition_table.insert(Entry {
         hash: board_key,
         score: best_score,
         depth,
         best_move,
         bound_type});
+    record_benchmark(benchmarking, benchmark_stats, BenchmarkStep::FinalStorage, step_start.elapsed());
     Result::new(best_score, best_move)
 }
 pub fn evaluate(position: &Chessboard, color: i8, params: &HeuristicParams) -> i32 {
@@ -317,3 +385,137 @@ impl Result {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+enum BenchmarkStep {
+    DepthZeroEval,
+    BoardHash,
+    TranspositionLookup,
+    MoveGeneration,
+    EmptyMoveCheck,
+    MoveOrdering,
+    TimeCutoffCheck,
+    MakeMove,
+    UndoMove,
+    ScoreUpdate,
+    CutoffStorage,
+    FinalStorage,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BenchmarkStats {
+    depth_zero_eval_count: u64,
+    depth_zero_eval_total_ns: u128,
+    board_hash_count: u64,
+    board_hash_total_ns: u128,
+    transposition_lookup_count: u64,
+    transposition_lookup_total_ns: u128,
+    move_generation_count: u64,
+    move_generation_total_ns: u128,
+    empty_move_check_count: u64,
+    empty_move_check_total_ns: u128,
+    move_ordering_count: u64,
+    move_ordering_total_ns: u128,
+    time_cutoff_check_count: u64,
+    time_cutoff_check_total_ns: u128,
+    make_move_count: u64,
+    make_move_total_ns: u128,
+    undo_move_count: u64,
+    undo_move_total_ns: u128,
+    score_update_count: u64,
+    score_update_total_ns: u128,
+    cutoff_storage_count: u64,
+    cutoff_storage_total_ns: u128,
+    final_storage_count: u64,
+    final_storage_total_ns: u128,
+}
+
+impl BenchmarkStats {
+    fn record(&mut self, step: BenchmarkStep, elapsed: Duration) {
+        let elapsed_ns = elapsed.as_nanos();
+        match step {
+            BenchmarkStep::DepthZeroEval => {
+                self.depth_zero_eval_count += 1;
+                self.depth_zero_eval_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::BoardHash => {
+                self.board_hash_count += 1;
+                self.board_hash_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::TranspositionLookup => {
+                self.transposition_lookup_count += 1;
+                self.transposition_lookup_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::MoveGeneration => {
+                self.move_generation_count += 1;
+                self.move_generation_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::EmptyMoveCheck => {
+                self.empty_move_check_count += 1;
+                self.empty_move_check_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::MoveOrdering => {
+                self.move_ordering_count += 1;
+                self.move_ordering_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::TimeCutoffCheck => {
+                self.time_cutoff_check_count += 1;
+                self.time_cutoff_check_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::MakeMove => {
+                self.make_move_count += 1;
+                self.make_move_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::UndoMove => {
+                self.undo_move_count += 1;
+                self.undo_move_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::ScoreUpdate => {
+                self.score_update_count += 1;
+                self.score_update_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::CutoffStorage => {
+                self.cutoff_storage_count += 1;
+                self.cutoff_storage_total_ns += elapsed_ns;
+            }
+            BenchmarkStep::FinalStorage => {
+                self.final_storage_count += 1;
+                self.final_storage_total_ns += elapsed_ns;
+            }
+        }
+    }
+
+    fn print_averages(&self) {
+        println!("\n=== Alpha-beta benchmarking averages ===");
+        Self::print_metric("depth_zero_eval", self.depth_zero_eval_total_ns, self.depth_zero_eval_count);
+        Self::print_metric("board_hash", self.board_hash_total_ns, self.board_hash_count);
+        Self::print_metric("transposition_lookup", self.transposition_lookup_total_ns, self.transposition_lookup_count);
+        Self::print_metric("move_generation", self.move_generation_total_ns, self.move_generation_count);
+        Self::print_metric("empty_move_check", self.empty_move_check_total_ns, self.empty_move_check_count);
+        Self::print_metric("move_ordering", self.move_ordering_total_ns, self.move_ordering_count);
+        Self::print_metric("time_cutoff_check", self.time_cutoff_check_total_ns, self.time_cutoff_check_count);
+        Self::print_metric("make_move", self.make_move_total_ns, self.make_move_count);
+        Self::print_metric("undo_move", self.undo_move_total_ns, self.undo_move_count);
+        Self::print_metric("score_update", self.score_update_total_ns, self.score_update_count);
+        Self::print_metric("cutoff_storage", self.cutoff_storage_total_ns, self.cutoff_storage_count);
+        Self::print_metric("final_storage", self.final_storage_total_ns, self.final_storage_count);
+    }
+
+    fn print_metric(name: &str, total_ns: u128, count: u64) {
+        if count == 0 {
+            println!("  {:<22}: n/a (0 samples)", name);
+            return;
+        }
+
+        let avg_ns = total_ns / count as u128;
+        let avg_us = avg_ns as f64 / 1_000.0;
+        println!("  {:<22}: {:>9.3} µs over {:>8} samples", name, avg_us, count);
+    }
+}
+
+fn record_benchmark(benchmarking: bool, benchmark_stats: &mut BenchmarkStats, step: BenchmarkStep, elapsed: Duration) {
+    if benchmarking {
+        benchmark_stats.record(step, elapsed);
+    }
+}
+

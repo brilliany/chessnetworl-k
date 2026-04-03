@@ -342,9 +342,10 @@ async fn make_engine_move(
 
     // run engine without lock to not block requests
     board.print_board();
-    let heuristics = chessnetwork_core::load_heuristics_from_config("config.yml");
-    let available_memory = chessnetwork_core::load_available_memory_from_config("config.yml");
-    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory);
+    let heuristics = load_heuristics_from_config("config.yml");
+    let available_memory = load_available_memory_from_config("config.yml");
+    let benchmarking = load_benchmarking_from_config("config.yml");
+    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory, benchmarking);
     let engine_move = engine.get_best_move(&mut board).unwrap();
 
     let result = MoveJson {

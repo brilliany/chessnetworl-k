@@ -18,6 +18,7 @@ pub use engine::Engine;
 pub use heuristics::HeuristicParams;
 pub use config_loader::load_heuristics_from_config;
 pub use config_loader::load_available_memory_from_config;
+pub use config_loader::load_benchmarking_from_config;
 
 /// Utility
 pub fn print_bitboard(board: u64) {

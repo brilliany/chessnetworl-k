@@ -42,3 +42,21 @@ pub fn load_available_memory_from_config(path: &str) -> usize {
         })
         .unwrap_or(2048)
 }
+
+pub fn load_benchmarking_from_config(path: &str) -> bool {
+    let config_string = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    let config: serde_yaml::Value = match serde_yaml::from_str(&config_string) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    config
+        .get("benchmarking")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
