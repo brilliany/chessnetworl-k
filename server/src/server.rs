@@ -249,12 +249,12 @@ async fn possible_moves(
 
     let moves: Vec<MoveJson> = generate_moves(chessboard, color)
         .into_iter()
-        .filter(|mv| mv.get_from_x() == x && mv.get_from_y() == y)
+        .filter(|mv| get_from_x(mv) == x && get_from_y(mv) == y)
         .map(|mv| MoveJson {
-            from_x: mv.get_from_x(),
-            from_y: mv.get_from_y(),
-            to_x: mv.get_to_x(),
-            to_y: mv.get_to_y(),
+            from_x: get_from_x(&mv),
+            from_y: get_from_y(&mv),
+            to_x: get_to_x(&mv),
+            to_y: get_to_y(&mv),
             special_move: move_to_special_move_hint(&mv),
         })
         .collect();
@@ -294,10 +294,10 @@ async fn move_piece(
         let selected_move = generate_moves(&mut session.board, turn)
             .into_iter()
             .find(|mv| {
-                mv.get_from_x() == from_x
-                    && mv.get_from_y() == from_y
-                    && mv.get_to_x() == to_x
-                    && mv.get_to_y() == to_y
+                get_from_x(mv) == from_x
+                    && get_from_y(mv) == from_y
+                    && get_to_x(mv) == to_x
+                    && get_to_y(mv) == to_y
                     && special_move
                         .map(|hint| move_to_special_move_hint(mv) == hint)
                         .unwrap_or(true)
@@ -342,17 +342,16 @@ async fn make_engine_move(
 
     // run engine without lock to not block requests
     board.print_board();
-    let heuristics = load_heuristics_from_config("config.yml");
-    let available_memory = load_available_memory_from_config("config.yml");
-    let benchmarking = load_benchmarking_from_config("config.yml");
-    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory, benchmarking);
+    let heuristics = chessnetwork_core::load_heuristics_from_config("config.yml");
+    let available_memory = chessnetwork_core::load_available_memory_from_config("config.yml");
+    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory);
     let engine_move = engine.get_best_move(&mut board).unwrap();
 
     let result = MoveJson {
-        from_x: engine_move.get_from_x(),
-        from_y: engine_move.get_from_y(),
-        to_x: engine_move.get_to_x(),
-        to_y: engine_move.get_to_y(),
+        from_x: get_from_x(&engine_move),
+        from_y: get_from_y(&engine_move),
+        to_x: get_to_x(&engine_move),
+        to_y: get_to_y(&engine_move),
         special_move: move_to_special_move_hint(&engine_move),
     };
 
@@ -384,6 +383,23 @@ fn move_to_special_move_hint(mv: &Move) -> SpecialMoveHint {
     } else {
         SpecialMoveHint::Normal
     }
+}
+
+// Move helpers
+fn get_from_x(mv: &Move) -> u8 {
+    (mv.get_from_mask().trailing_zeros() as u8) % 8
+}
+
+fn get_from_y(mv: &Move) -> u8 {
+    (mv.get_from_mask().trailing_zeros() as u8) / 8
+}
+
+fn get_to_x(mv: &Move) -> u8 {
+    (mv.get_to_mask().trailing_zeros() as u8) % 8
+}
+
+fn get_to_y(mv: &Move) -> u8 {
+    (mv.get_to_mask().trailing_zeros() as u8) / 8
 }
 
 // Session helpers

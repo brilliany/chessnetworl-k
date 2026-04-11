@@ -4,6 +4,7 @@ use rand:: {Rng, SeedableRng};
 use rand:: rngs::StdRng;
 
 use lazy_static::lazy_static;
+use crate::Color::{BLACK, WHITE};
 
 //once values are initialized we dont need to make new tables
 lazy_static! {
@@ -167,7 +168,7 @@ impl Chessboard {
 
         let from = mv.get_from_mask();
         let to = mv.get_to_mask();
-        let piece = self.get_piece_at(from);
+        let piece = (mv.get_piece_type(), mv.get_color());
         let (piece_type, color) = piece;
 
         // If en passant is active, XOR it out of the hash before clearing it
@@ -186,8 +187,20 @@ impl Chessboard {
        zobrist.toggle_side(&mut self.zobrist_hash);
    }
 
-    fn assign_en_passant(&mut self, from: u64, to: u64, piece_type: u8, color: i8, zobrist: &ZobristTable) {
-        // Set en_passant to the file (1–8) of the pawn that just double-pushed, or 0 for none.
+    fn assign_en_passant(&mut self, from: u64, to: u64, piece_type: u8, color: Color, zobrist: &ZobristTable) {
+
+        //todo 
+
+        // if difference between from and to is a double pawn push, set en passant target
+        if piece_type == PAWN && from.abs_diff(to) == 16 {
+            // from is on rank 1 (bits 8–15) for white or rank 6 (bits 48–55) for black; file = bit_index % 8, stored 1-based
+            let file = (from.trailing_zeros() % 8 + 1) as u8;
+            zobrist.toggle_en_passant(&mut self.zobrist_hash, file as usize);
+            self.en_passant = file;
+        }
+
+
+       /* // Set en_passant to the file (1–8) of the pawn that just double-pushed, or 0 for none.
         // Using 1-based file so that 0 unambiguously means "no en passant".
         if (piece_type, color) == (PAWN, WHITE) && from << 16 == to {
             // from is on rank 1 (bits 8–15); file = bit_index % 8, stored 1-based
@@ -199,7 +212,7 @@ impl Chessboard {
             let file = (from.trailing_zeros() % 8 + 1) as u8;
             zobrist.toggle_en_passant(&mut self.zobrist_hash, file as usize);
             self.en_passant = file;
-        }
+        }*/
     }
 
     fn update_castling_rights(&mut self, from: u64, to: u64, zobrist: &ZobristTable) {

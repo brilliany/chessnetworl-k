@@ -10,8 +10,10 @@ macro_rules! define_consts {
         pub const KING: u8 = 6;
         pub const EMPTY: u8 = 0;
 
-        pub const WHITE: i8 = 1;
-        pub const BLACK: i8 = -1;
+
+        pub const WHITE: u8 = 1,
+        pub const  BLACK: u8 = 0,
+        
         pub const NONE: i8 = 0;
 
         // Ranks
