@@ -11,10 +11,10 @@ macro_rules! define_consts {
         pub const EMPTY: u8 = 0;
 
 
-        pub const WHITE: u8 = 1,
-        pub const  BLACK: u8 = 0,
-        
-        pub const NONE: i8 = 0;
+        pub const WHITE: u8 = 1;
+        pub const BLACK: u8 = 0;
+
+        pub const NONE: u8 = 0;
 
         // Ranks
         const RANK_0: u64 = 0x00000000000000FFu64;
@@ -52,7 +52,7 @@ macro_rules! define_consts {
 
 
         //starting position bitboards for each piece type
-        pub const STARTING_POS : &[(u8, i8, u64)] = &[
+        pub const STARTING_POS : &[(u8, u8, u64)] = &[
             (PAWN, WHITE, RANKS[1]),
             (PAWN, BLACK, RANKS[6]),
             (KNIGHT, BLACK, (1u64 << 57) | (1u64 << 62)),

@@ -2,7 +2,7 @@ use crate::chessboard::Chessboard;
 use crate::r#move::Move;
 use crate::{BISHOP, BLACK, BLACK_KINGSIDE_CASTLE, BLACK_QUEENSIDE_CASTLE, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE, WHITE_KINGSIDE_CASTLE, WHITE_QUEENSIDE_CASTLE};
 
-pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
+pub fn generate_moves(chessboard: &mut Chessboard, color: u8) -> Vec<Move> {
     let mut moves = Vec::new();
 
     get_pawn_moves(chessboard, color, &mut moves);
@@ -15,7 +15,7 @@ pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
     moves.retain(|mv| {
         chessboard.make_move(*mv);
         let king_mask = chessboard.get_piece_mask(KING, color);
-        let legal = !is_square_attacked(chessboard, king_mask, -color);
+        let legal = !is_square_attacked(chessboard, king_mask, color^1);
         chessboard.undo_move();
         legal
     });
@@ -24,8 +24,8 @@ pub fn generate_moves(chessboard: &mut Chessboard, color: i8) -> Vec<Move> {
 }
 
 //todo castling, en pessant, promotion
-pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
-    // todo add an 'en pessant mask' and use that instead of checking the last move
+pub fn get_pawn_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>) {
+    // todo add an 'en passant mask' and use that instead of checking the last move
     if color == WHITE {
         let pieces = chessboard.get_white_pieces();
         let opponent_pieces = chessboard.get_black_pieces();
@@ -58,27 +58,27 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         while move_mask != 0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
             let from_square = to_square >> 8;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, WHITE));
             move_mask &= move_mask - 1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let to_square = 1u64 << two_step_pawns.trailing_zeros();
             let from_square = to_square >> 16;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::double_pawn_push(from_square, to_square, PAWN, WHITE));
             two_step_pawns &= two_step_pawns - 1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square >> 9;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, WHITE));
             left_capture_mask &= left_capture_mask - 1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square >> 7;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, WHITE));
             right_capture_mask &= right_capture_mask - 1;
         }
 
@@ -91,14 +91,14 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let right_capture = (captured_square & !FILES[0]) >> 1;
             if right_capture & pawns != 0 {
                 let from_square = right_capture;
-                moves.push(Move::en_passant(from_square, to_square, captured_square));
+                moves.push(Move::en_passant(from_square, to_square, PAWN, WHITE, captured_square));
             }
 
             // check if the left capture can perform en passant
             let left_capture = (captured_square & !FILES[7]) << 1;
             if left_capture & pawns != 0 {
                 let from_square = left_capture;
-                moves.push(Move::en_passant(from_square, to_square, captured_square));
+                moves.push(Move::en_passant(from_square, to_square, PAWN, WHITE, captured_square));
             }
         }
 
@@ -106,7 +106,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << left_promotion_capture_mask.trailing_zeros();
             let from_square = to_square >> 9;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, WHITE, piece_type));
             }
             left_promotion_capture_mask &= left_promotion_capture_mask - 1;
         }
@@ -115,7 +115,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << right_promotion_capture_mask.trailing_zeros();
             let from_square = to_square >> 7;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, WHITE, piece_type));
             }
             right_promotion_capture_mask &= right_promotion_capture_mask - 1;
         }
@@ -124,7 +124,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << promotion_mask.trailing_zeros();
             let from_square = to_square >> 8;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, WHITE, piece_type));
             }
             promotion_mask &= promotion_mask - 1;
         }
@@ -139,7 +139,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             //we dont care about pawns on the last ranks
             (pawns & !RANKS[0]) >> 8
                 //dont generate when pieces are in front
-                & !((pieces | opponent_pieces));
+                & !(pieces | opponent_pieces);
 
         let mut promotion_mask = move_mask & RANKS[0];
 
@@ -161,27 +161,27 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
         while move_mask != 0 {
             let to_square = 1u64 << move_mask.trailing_zeros();
             let from_square = to_square << 8;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, BLACK));
             move_mask &= move_mask - 1;
         }
         //two step moves
         while two_step_pawns != 0 {
             let to_square = 1u64 << two_step_pawns.trailing_zeros();
             let from_square = to_square << 16;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::double_pawn_push(from_square, to_square, PAWN, BLACK));
             two_step_pawns &= two_step_pawns - 1;
         }
         //capturing moves
         while left_capture_mask != 0 {
             let to_square = 1u64 << left_capture_mask.trailing_zeros();
             let from_square = to_square << 7;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, BLACK));
             left_capture_mask &= left_capture_mask - 1;
         }
         while right_capture_mask != 0 {
             let to_square = 1u64 << right_capture_mask.trailing_zeros();
             let from_square = to_square << 9;
-            moves.push(Move::new(from_square, to_square));
+            moves.push(Move::new(from_square, to_square, PAWN, BLACK));
             right_capture_mask &= right_capture_mask - 1;
         }
 
@@ -196,13 +196,13 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let right_capture = (captured_square & !FILES[7]) << 1;
             if right_capture & pawns != 0 {
                 let from_square = right_capture;
-                moves.push(Move::en_passant(from_square, to_square, captured_square));
+                moves.push(Move::en_passant(from_square, to_square, PAWN, BLACK, captured_square));
             }
 
             let left_capture = (captured_square & !FILES[0]) >> 1;
             if left_capture & pawns != 0 {
                 let from_square = left_capture;
-                moves.push(Move::en_passant(from_square, to_square, captured_square));
+                moves.push(Move::en_passant(from_square, to_square, PAWN, BLACK, captured_square));
             }
         }
 
@@ -210,7 +210,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << left_promotion_capture_mask.trailing_zeros();
             let from_square = to_square << 7;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, BLACK, piece_type));
             }
             left_promotion_capture_mask &= left_promotion_capture_mask - 1;
         }
@@ -219,7 +219,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << right_promotion_capture_mask.trailing_zeros();
             let from_square = to_square << 9;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, BLACK, piece_type));
             }
             right_promotion_capture_mask &= right_promotion_capture_mask - 1;
         }
@@ -228,7 +228,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
             let to_square = 1u64 << promotion_mask.trailing_zeros();
             let from_square = to_square << 8;
             for piece_type in [QUEEN, ROOK, BISHOP, KNIGHT] {
-                moves.push(Move::promotion(from_square, to_square, piece_type));
+                moves.push(Move::promotion(from_square, to_square, PAWN, BLACK, piece_type));
             }
             promotion_mask &= promotion_mask - 1;
         }
@@ -236,7 +236,7 @@ pub fn get_pawn_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>)
 }
 
 
-pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
+pub fn get_knight_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>) {
     let mut knight_mask = chessboard.get_piece_mask(KNIGHT, color);
     let own_pieces = if color == 1 { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
 
@@ -266,7 +266,7 @@ pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
         let mut targets = move_mask;
         while targets != 0 {
             let to = 1u64 << targets.trailing_zeros();
-            moves.push(Move::new(from, to));
+            moves.push(Move::new(from, to, KNIGHT, color));
             targets &= targets - 1;
         }
         knight_mask &= knight_mask - 1;
@@ -275,9 +275,9 @@ pub fn get_knight_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
 
 
 
-pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
+pub fn get_bishop_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
     // if queen_mask is Some, use that as the bishop mask, otherwise use the bishops from the chessboard
-    let mut bishop_mask = if let Some(q_mask) = queen_mask {
+    let mut bishop_mask = if let Some(_q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(BISHOP, WHITE).clone()
@@ -294,8 +294,8 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
         let from = 1u64 << bishop_mask.trailing_zeros();
         if (from & (RANKS[7] | FILES[7])) == 0 {
             for i in 1..8 {
-                let dest = from << 9 * i;
-                move_mask |= dest &! own_pieces;
+                let dest = from << (9 * i);
+                move_mask |= dest & !own_pieces;
                 if (dest & ((RANKS[7] | FILES[7]) | all_pieces)) != 0 {
                     break;
                 }
@@ -304,7 +304,7 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
 
         if (from & (RANKS[0] | FILES[7])) == 0 {
             for i in 1..8 {
-                let dest = from >> 7 * i;
+                let dest = from >> (7 * i);
                 move_mask |= dest & !own_pieces;
                 if (dest & ((RANKS[0] | FILES[7]) | all_pieces)) != 0 {
                     break;
@@ -313,7 +313,7 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
         }
         if (from & (RANKS[7] | FILES[0])) == 0 {
             for i in 1..8 {
-                let dest = from << 7 * i;
+                let dest = from << (7 * i);
                 move_mask |= dest & !own_pieces;
                 if (dest & ((FILES[0] | RANKS[7]) | all_pieces)) != 0 {
                     break;
@@ -322,7 +322,7 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
         }
         if (from & (RANKS[0] | FILES[0])) == 0 {
             for i in 1..8 {
-                let dest = from >> 9 * i;
+                let dest = from >> (9 * i);
                 move_mask |= dest & !own_pieces;
                 if (dest & ((FILES[0] | RANKS[0]) | all_pieces)) != 0 {
                     break;
@@ -333,7 +333,7 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
         move_mask &= !own_pieces;
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-            moves.push(Move::new(from, to));
+            moves.push(Move::new(from, to, BISHOP, color));
             move_mask &= move_mask - 1;
         }
         bishop_mask &= bishop_mask - 1;
@@ -341,8 +341,8 @@ pub fn get_bishop_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move
 }
 
 // same logic as bishop but for straight lines
-pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
-    let mut rook_mask = if let Some(q_mask) = queen_mask {
+pub fn get_rook_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>, queen_mask: Option<u64>) {
+    let mut rook_mask = if let Some(_q_mask) = queen_mask {
         queen_mask.unwrap()
     } else if color == 1 {
         chessboard.get_piece_mask(ROOK, WHITE)
@@ -361,8 +361,8 @@ pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>,
         if (from & RANKS[7]) == 0 {
             //upwards from white perspective
             for i in 1..8 {
-                let dest = from << 8 * i;
-                move_mask |= dest &! own_pieces;
+                let dest = from << (8 * i);
+                move_mask |= dest & !own_pieces;
                 //stop on own pieces and last rank
                 if dest & (RANKS[7] | all_pieces) != 0 {
                     break;
@@ -373,7 +373,7 @@ pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>,
         if (from & RANKS[0]) == 0 {
             //down
             for i in 1..8 {
-                let dest = from >> 8 * i;
+                let dest = from >> (8 * i);
                 move_mask |= dest & !own_pieces;
                 //stop on own pieces and last rank
                 if dest & (RANKS[0] | all_pieces) != 0 {
@@ -384,7 +384,7 @@ pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>,
         if (from & FILES[7]) == 0 {
             //left
             for i in 1..8 {
-                let dest = from << 1 * i;
+                let dest = from << (1 * i);
                 move_mask |= dest & !own_pieces;
                 //stop on own pieces and last rank
                 if dest & (FILES[7] | all_pieces) != 0 {
@@ -394,7 +394,7 @@ pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>,
         }
         if (from & FILES[0]) == 0 {
             for i in 1..8 {
-                let dest = from >> 1 * i;
+                let dest = from >> (1 * i);
                 move_mask |= dest & !own_pieces;
                 //stop on own pieces and last rank
                 if dest & (FILES[0] | all_pieces) != 0 {
@@ -406,14 +406,14 @@ pub fn get_rook_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>,
         move_mask &= !own_pieces;
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-            moves.push(Move::new(from, to));
+            moves.push(Move::new(from, to, ROOK, color));
             move_mask &= move_mask - 1;
         }
         rook_mask &= rook_mask - 1;
     }
 }
 
-pub fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>) {
+pub fn get_queen_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>) {
     let queen_mask = chessboard.get_piece_mask(QUEEN, color).clone();
     // conveniently reuse bishop and rook move generation for queen moves
     get_bishop_moves(chessboard, color, moves, Some(queen_mask));
@@ -421,7 +421,7 @@ pub fn get_queen_moves(chessboard: &Chessboard, color: i8, moves: &mut Vec<Move>
 }
 
 
-pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Move>) {
+pub fn get_king_moves(chessboard: &mut Chessboard, color: u8, moves: &mut Vec<Move>) {
     let mut king_mask = chessboard.get_piece_mask(KING, color);
 
     let own_pieces = if color == WHITE { chessboard.get_white_pieces() } else { chessboard.get_black_pieces() };
@@ -450,9 +450,9 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
 
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-            chessboard.make_move(Move::new(from, to));
-            if !is_square_attacked(chessboard, to, -color) {
-                moves.push(Move::new(from, to));
+            chessboard.make_move(Move::new(from, to, KING, color));
+            if !is_square_attacked(chessboard, to, color^1) {
+                moves.push(Move::new(from, to, KING, color));
             }
             chessboard.undo_move();
             move_mask &= move_mask - 1;
@@ -465,18 +465,18 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
     if color == WHITE {
         if (castling_rights & WHITE_KINGSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 1) | (1 << 2))) == 0 {
-                chessboard.make_move(Move::castling(1 << 3, 1 << 1, 1 << 0, 1 << 2));
-                if !is_square_attacked(chessboard, 1 << 2, -color) && !is_square_attacked(chessboard, 1 << 1, -color) {
-                    moves.push(Move::castling(1 << 3, 1 << 1, 1 << 0, 1 << 2));
+                chessboard.make_move(Move::castling(1 << 3, 1 << 1, KING, WHITE, 1 << 0, 1 << 2));
+                if !is_square_attacked(chessboard, 1 << 2, color^1) && !is_square_attacked(chessboard, 1 << 1, color^1) {
+                    moves.push(Move::castling(1 << 3, 1 << 1, KING, WHITE, 1 << 0, 1 << 2));
                 }
                 chessboard.undo_move();
             }
         }
         if (castling_rights & WHITE_QUEENSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 4) | (1 << 5) | (1 << 6))) == 0 {
-                chessboard.make_move(Move::castling(1 << 3, 1 << 5, 1 << 7, 1 << 4));
-                if !is_square_attacked(chessboard, 1 << 4, -color) && !is_square_attacked(chessboard, 1 << 5, -color) {
-                    moves.push(Move::castling(1 << 3, 1 << 5, 1 << 7, 1 << 4));
+                chessboard.make_move(Move::castling(1 << 3, 1 << 5, KING, WHITE, 1 << 7, 1 << 4));
+                if !is_square_attacked(chessboard, 1 << 4, color^1) && !is_square_attacked(chessboard, 1 << 5, color^1) {
+                    moves.push(Move::castling(1 << 3, 1 << 5, KING, WHITE, 1 << 7, 1 << 4));
                 }
                 chessboard.undo_move();
             }
@@ -484,18 +484,18 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
     } else {
         if (castling_rights & BLACK_KINGSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 57) | (1 << 58))) == 0 {
-                chessboard.make_move(Move::castling(1 << 59, 1 << 57, 1 << 56, 1 << 58));
-                if !is_square_attacked(chessboard, 1 << 58, -color) && !is_square_attacked(chessboard, 1 << 57, -color) {
-                    moves.push(Move::castling(1 << 59, 1 << 57, 1 << 56, 1 << 58));
+                chessboard.make_move(Move::castling(1 << 59, 1 << 57, KING, BLACK, 1 << 56, 1 << 58));
+                if !is_square_attacked(chessboard, 1 << 58, color^1) && !is_square_attacked(chessboard, 1 << 57, color^1) {
+                    moves.push(Move::castling(1 << 59, 1 << 57, KING, BLACK, 1 << 56, 1 << 58));
                 }
                 chessboard.undo_move();
             }
         }
         if (castling_rights & BLACK_QUEENSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 60) | (1 << 61) | (1 << 62))) == 0 {
-                chessboard.make_move(Move::castling(1 << 59, 1 << 61, 1 << 63, 1 << 60));
-                if !is_square_attacked(chessboard, 1 << 60, -color) && !is_square_attacked(chessboard, 1 << 61, -color) {
-                    moves.push(Move::castling(1 << 59, 1 << 61, 1 << 63, 1 << 60));
+                chessboard.make_move(Move::castling(1 << 59, 1 << 61, KING, BLACK, 1 << 63, 1 << 60));
+                if !is_square_attacked(chessboard, 1 << 60, color^1) && !is_square_attacked(chessboard, 1 << 61, color^1) {
+                    moves.push(Move::castling(1 << 59, 1 << 61, KING, BLACK, 1 << 63, 1 << 60));
                 }
                 chessboard.undo_move();
             }
@@ -503,7 +503,7 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: i8, moves: &mut Vec<Mo
     }
 }
 
-pub fn is_square_attacked(chessboard: &Chessboard, square_mask: u64, attacker_color: i8) -> bool {
+pub fn is_square_attacked(chessboard: &Chessboard, square_mask: u64, attacker_color: u8) -> bool {
     let mut moves = Vec::new();
 
     get_pawn_moves(chessboard, attacker_color, &mut moves);

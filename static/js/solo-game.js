@@ -74,10 +74,10 @@ function makeMove(x, y, toX, toY, specialMove) {
             "Content-Type": "application/json",
         },
         credentials: "include",
-    }).then((response) => {
-        if (response.status === 200) {
-            currentTurn *= -1;
-            populateBoard();
+     }).then((response) => {
+         if (response.status === 200) {
+             currentTurn ^= 1;
+             populateBoard();
             isSubmittingMove = false;
         } else {
             isSubmittingMove = false;

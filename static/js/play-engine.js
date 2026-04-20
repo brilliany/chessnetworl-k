@@ -9,7 +9,7 @@ let isSubmittingMove = false;
 initialRequest(sessionId);
 async function initialRequest(sessionId) {
     let data = await getSession(sessionId, "Could not get color");
-    color = -data.opponent;
+    color = data.opponent ^ 1;
     populateBoard(sessionId);
 }
 
@@ -144,7 +144,7 @@ function movePiece(x, y, toX, toY, specialMove = "normal") {
     }
 
     //add event listener to piece if it's the player's color
-    const pieceColor = pieceElement.getAttribute("alt").startsWith("white") ? 1 : -1;
+    const pieceColor = pieceElement.getAttribute("alt").startsWith("white") ? 1 : 0;
     if (pieceColor === color) {
         addListenerToPiece(pieceElement, pieceElement.getAttribute("alt"), toX, toY, color, savedPossibleMoves, makeMove);
     }

@@ -71,7 +71,7 @@ impl Move {
     }
     
     ///Would be nice just to call this 'type' wouldnt it
-    pub fn mv_type(&self) -> MoveType {
+    pub fn move_type(&self) -> MoveType {
         self.move_type
     }
 
@@ -94,7 +94,7 @@ impl Move {
         ((self.move_representation >> 12) & 0b111) as u8 // bits 12-14 for piece type
     }
     
-    pub fn get_color(&self) -> Color {
+    pub fn get_color(&self) -> u8 {
         if (self.move_representation >> 15) & 1 == 1 {
             WHITE
         } else {

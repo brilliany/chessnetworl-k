@@ -106,8 +106,8 @@ function addPieceToSquare(squareElement, pieceName, x, y, currentColor, savedPos
     pieceImg.setAttribute("alt", pieceName);
 
     let listenerFunction = null;
-    const pieceColor = pieceName.startsWith("white") ? 1 : -1;
-    if (pieceColor === currentColor) {
+     const pieceColor = pieceName.startsWith("white") ? 1 : 0;
+     if (pieceColor === currentColor) {
         listenerFunction = addListenerToPiece(pieceImg, pieceName, x, y, currentColor, savedPossibleMoves, makeMove);
     }
 

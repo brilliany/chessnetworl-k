@@ -13,22 +13,20 @@ const MIN_SCORE: i32 = -100_000;
 const MAX_SCORE: i32 = 100_000;
 
 
-const TIME_CUTOFF: u64 = 200;
+const TIME_CUTOFF: u64 = 2000;
 
 #[derive(Clone)]
 pub struct Engine {
     depth: i32,
-    color: i8,
+    color: u8,
     transposition_table: TranspositionTable,
     killer_moves: HashMap<Move, i32>,
     pub heuristics: HeuristicParams,
 }
 
 impl Engine {
-    pub fn new_single(depth: i32, color: i8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
+    pub fn new_single(depth: i32, color: u8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
         // Use all available memory specifically for the transposition table
-        // We'll avoid allocating massive exact capacities for HashMaps to prevent extreme OS mappings
-        // that cause OOM exceptions and fragmentation.
         let tt_memory = available_memory_mb;
 
         let transposition_table = TranspositionTable::new(tt_memory.max(1));
@@ -60,6 +58,7 @@ impl Engine {
         let mut best_score = MIN_SCORE;
 
         let mut last_time = 0u64;
+        let mut reached_depth = 0;
         // Iterative deepening loop
         for current_depth in 1..=self.depth {
             if start.elapsed().as_millis() as u64 > TIME_CUTOFF {
@@ -71,6 +70,7 @@ impl Engine {
                 current_depth,
                 MIN_SCORE,
                 MAX_SCORE,
+                self.color,
                 self.color,
                 true,
                 chessboard,
@@ -97,17 +97,29 @@ impl Engine {
             best_score = result.score;
 
             last_time = start.elapsed().as_millis() as u64;
+            reached_depth = current_depth;
         }
-
+        println!("Engine chose move {:?} with score {} in {} ms, depth {}", best_move, best_score, last_time, reached_depth);
         best_move
     }
 }
 
 // go to the wikipedia page if you want to understand this
-fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_player: bool, chessboard: &mut Chessboard, transposition_table: &mut TranspositionTable, killer_moves: &mut HashMap<Move, i32>, heuristics_params: &HeuristicParams, start_time: &std::time::Instant) -> Result {
+fn alpha_beta(
+    depth: i32,
+    mut alpha: i32,
+    mut beta: i32,
+    color_to_move: u8,
+    root_color: u8,
+    maximizing_player: bool,
+    chessboard: &mut Chessboard,
+    transposition_table: &mut TranspositionTable,
+    killer_moves: &mut HashMap<Move, i32>,
+    heuristics_params: &HeuristicParams,
+    start_time: &std::time::Instant,
+) -> Result {
     if depth == 0 {
-        let eval_color = if maximizing_player { color } else { -color };
-        let score = evaluate(chessboard, eval_color, heuristics_params);
+        let score = evaluate(chessboard, root_color, heuristics_params);
         /*println!("Reached end of depth");
            chessboard.print_board();*/
         return Result::new(score, None);
@@ -130,7 +142,7 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
     }
     let mut best_score = if maximizing_player { MIN_SCORE } else { MAX_SCORE };
     let mut best_move = None;
-    let mut moves = generate_moves(chessboard, color);
+    let mut moves = generate_moves(chessboard, color_to_move);
     if moves.len() == 0 {
         return Result::new(if maximizing_player { MIN_SCORE } else { MAX_SCORE }, None);
     }
@@ -149,7 +161,19 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
         }
 
         chessboard.make_move(mov);
-        let result = alpha_beta(depth - 1, alpha, beta, -color, !maximizing_player, chessboard, transposition_table, killer_moves, heuristics_params, start_time);
+        let result = alpha_beta(
+            depth - 1,
+            alpha,
+            beta,
+            color_to_move ^ 1,
+            root_color,
+            !maximizing_player,
+            chessboard,
+            transposition_table,
+            killer_moves,
+            heuristics_params,
+            start_time,
+        );
         chessboard.undo_move();
         let score = result.score;
         if maximizing_player && score > best_score {
@@ -197,13 +221,13 @@ fn alpha_beta(depth: i32, mut alpha: i32, mut beta: i32, color: i8, maximizing_p
         bound_type});
     Result::new(best_score, best_move)
 }
-pub fn evaluate(position: &Chessboard, color: i8, params: &HeuristicParams) -> i32 {
+pub fn evaluate(position: &Chessboard, color: u8, params: &HeuristicParams) -> i32 {
     let mut score = 0;
     score += material(position, color);
     score += evaluate_heuristics(position, color, params);
     score
 }
-pub fn evaluate_heuristics(position: &Chessboard, color: i8, h: &HeuristicParams) -> i32 {
+pub fn evaluate_heuristics(position: &Chessboard, color: u8, h: &HeuristicParams) -> i32 {
     let mut score: i32 = 0;
     let heuristics_eval = Heuristics::new(position, color);
     score += heuristics_eval.two_middle_pawns() * h.two_middle_pawns_weight;
@@ -213,10 +237,10 @@ pub fn evaluate_heuristics(position: &Chessboard, color: i8, h: &HeuristicParams
     score += heuristics_eval.mobility() * h.mobility_weight;
     score
 }
-pub fn material(position: &Chessboard, for_color: i8) -> i32 {
+pub fn material(position: &Chessboard, for_color: u8) -> i32 {
     let mut score = 0;
-    for i in 1..6 {
-        let piece_value = match i {
+    for piece in 1..=6 {
+        let piece_value = match piece {
             PAWN => 10,
             KNIGHT => 30,
             BISHOP => 35,
@@ -227,11 +251,11 @@ pub fn material(position: &Chessboard, for_color: i8) -> i32 {
             _ => 0,
         };
         if for_color == WHITE {
-            score += position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
-            score -= position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+            score += position.get_piece_mask(piece, WHITE).count_ones() as i32 * piece_value;
+            score -= position.get_piece_mask(piece, BLACK).count_ones() as i32 * piece_value;
         } else {
-            score -= position.get_piece_mask((i + 1) as u8, WHITE).count_ones() as i32 * piece_value;
-            score += position.get_piece_mask((i + 1) as u8, BLACK).count_ones() as i32 * piece_value;
+            score -= position.get_piece_mask(piece, WHITE).count_ones() as i32 * piece_value;
+            score += position.get_piece_mask(piece, BLACK).count_ones() as i32 * piece_value;
         }
     }
     score
@@ -239,7 +263,7 @@ pub fn material(position: &Chessboard, for_color: i8) -> i32 {
 
 #[derive(Debug, Clone)]
 struct TranspositionTable {
-    // Use a fixed-size array with index = hash % size for O(1) access
+
     entries: Vec<Option<Entry>>,
     size: usize,
 }
@@ -255,7 +279,7 @@ struct Entry {
 
 impl TranspositionTable {
     fn new(size_mb: usize) -> Self {
-        let entry_size = std::mem::size_of::<Option<Entry>>();
+        let entry_size = size_of::<Option<Entry>>();
         let num_entries = (size_mb * 1024 * 1024) / entry_size;
         TranspositionTable {
             entries:  vec![None; num_entries],
@@ -278,7 +302,7 @@ impl TranspositionTable {
             None => {
                 self.entries[idx] = Some(entry);
             }
-            _ => {} // scrap if theyre the same
+            _ => {}
         }
     }
 }

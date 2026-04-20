@@ -145,7 +145,7 @@ fn api_routes(state: AppState) -> Router {
 struct PossibleMovesQuery {
     x: u8,
     y: u8,
-    color: i8,
+    color: u8,
 }
 
 #[derive(Deserialize)]
@@ -182,9 +182,9 @@ struct PossibleMovesResponse {
 #[derive(Serialize)]
 struct SessionResponse {
     board: serde_json::Value,
-    turn: i8,
-    opponent: i8,
-    user: i8,
+    turn: u8,
+    opponent: u8,
+    user: u8,
     session_id: String,
 }
 
@@ -290,8 +290,8 @@ async fn move_piece(
             .get_mut(&session_id)
             .expect("session not found");
 
-        let turn = session.get_turn();
-        let selected_move = generate_moves(&mut session.board, turn)
+        let user_color = session.get_user_color();
+        let selected_move = generate_moves(&mut session.board, user_color)
             .into_iter()
             .find(|mv| {
                 get_from_x(mv) == from_x
@@ -327,7 +327,7 @@ async fn make_engine_move(
     let session_id = get_session_id(&jar);
 
     // lock session to get board
-    let mut board = {
+    let (mut board, opponent_color) = {
         let mut sessions = match state.sessions.lock() {
             Ok(s) => s,
             Err(poisoned) => {
@@ -337,14 +337,14 @@ async fn make_engine_move(
         };
 
         let session = sessions.get_mut(&session_id).unwrap();
-        session.board.clone()
+        (session.board.clone(), session.get_opponent_color())
     };
 
     // run engine without lock to not block requests
     board.print_board();
-    let heuristics = chessnetwork_core::load_heuristics_from_config("config.yml");
-    let available_memory = chessnetwork_core::load_available_memory_from_config("config.yml");
-    let mut engine = Engine::new_single(60, BLACK, heuristics, available_memory);
+    let heuristics = load_heuristics_from_config("config.yml");
+    let available_memory = load_available_memory_from_config("config.yml");
+    let mut engine = Engine::new_single(60, opponent_color, heuristics, available_memory);
     let engine_move = engine.get_best_move(&mut board).unwrap();
 
     let result = MoveJson {
