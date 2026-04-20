@@ -8,6 +8,8 @@ pub mod config_loader;
 
 mod r#move;
 pub mod constants;
+mod game;
+mod zobrist;
 
 define_consts!();
 

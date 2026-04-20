@@ -1,5 +1,4 @@
 use crate::{BISHOP, KING, KNIGHT, PAWN, QUEEN, ROOK};
-use rayon::prelude::*;
 use std::collections::HashMap;
 
 use crate::chessboard::Chessboard;
@@ -8,6 +7,7 @@ use crate::heuristics::{HeuristicParams, Heuristics};
 use crate::movegenerator::generate_moves;
 use crate::r#move::Move;
 use crate::{BLACK, WHITE};
+use crate::zobrist::ZobristTable;
 
 const MIN_SCORE: i32 = -100_000;
 const MAX_SCORE: i32 = 100_000;
@@ -15,21 +15,26 @@ const MAX_SCORE: i32 = 100_000;
 
 const TIME_CUTOFF: u64 = 2000;
 
-#[derive(Clone)]
 pub struct Engine {
-    depth: i32,
+    depth: u32,
     color: u8,
     transposition_table: TranspositionTable,
     killer_moves: HashMap<Move, i32>,
-    pub heuristics: HeuristicParams,
+    heuristics: HeuristicParams,
+    zobrist_table: ZobristTable
 }
 
+/**The main chess engine struct
+    * has direct board access for fast move generation and evaluation
+**/
 impl Engine {
-    pub fn new_single(depth: i32, color: u8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
+    /// Create a new engine with the given chessboard, search depth, color to play, heuristic parameters, and available
+    pub fn new(chessboard: Chessboard, depth: u32, color: u8, heuristics: HeuristicParams, available_memory_mb: usize) -> Self {
         // Use all available memory specifically for the transposition table
         let tt_memory = available_memory_mb;
 
         let transposition_table = TranspositionTable::new(tt_memory.max(1));
+        let zobrist_table = ZobristTable::new(chessboard);
 
         let killer_moves = HashMap::new();
         Engine {
@@ -38,6 +43,7 @@ impl Engine {
             transposition_table,
             killer_moves,
             heuristics,
+            zobrist_table,
         }
     }
 
@@ -48,7 +54,7 @@ impl Engine {
     fn start_single_search(&mut self, chessboard: &mut Chessboard) -> Option<Move> {
         let start = std::time::Instant::now();
 
-        let mut moves = generate_moves(chessboard, self.color);
+        let moves = generate_moves(chessboard, self.color);
         // println!("{} moves available for engine", moves.len());
         if moves.is_empty() {
             return None;
@@ -106,7 +112,7 @@ impl Engine {
 
 // go to the wikipedia page if you want to understand this
 fn alpha_beta(
-    depth: i32,
+    depth: u32,
     mut alpha: i32,
     mut beta: i32,
     color_to_move: u8,

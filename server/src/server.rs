@@ -344,7 +344,7 @@ async fn make_engine_move(
     board.print_board();
     let heuristics = load_heuristics_from_config("config.yml");
     let available_memory = load_available_memory_from_config("config.yml");
-    let mut engine = Engine::new_single(60, opponent_color, heuristics, available_memory);
+    let mut engine = Engine::new(60, opponent_color, heuristics, available_memory);
     let engine_move = engine.get_best_move(&mut board).unwrap();
 
     let result = MoveJson {
@@ -424,7 +424,7 @@ fn get_or_create_session(jar: &CookieJar, sessions: &Sessions) -> Session {
 
     if !map.contains_key(&id) {
         let mut board = Chessboard::default();
-        board.init();
+        board.new();
         let session = Session::new(id.clone(), board, 1, WHITE, BLACK);
         map.insert(id.clone(), session);
     }
