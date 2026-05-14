@@ -18,7 +18,7 @@ pub enum GameStatus {
     Draw,
 }
 
-enum IllegalMove {
+pub enum IllegalMove {
     InvalidMove,
     NotPlayersTurn,
 }
@@ -65,16 +65,8 @@ impl Game {
             en_passant: self.board.get_en_passant(),
             status: self.status.clone(),
         });
-
-        let from = mv.get_from_mask();
-        let to = mv.get_to_mask();
-        let piece = (mv.get_piece_type(), mv.get_color());
-        let (piece_type, color) = piece;
-
-        // Update castling rights
-        self.board.update_castling_rights(from, to);
     
-        self.board.move_piece(piece_type, color, &mv);
+        self.board.move_piece(&mv);
     
         // Switch turn
         self.turn = if self.turn == WHITE { BLACK } else { WHITE };
@@ -85,7 +77,7 @@ impl Game {
     }
     
     /// Undo the last move by restoring the previous board state
-    pub fn undo_move(&mut self) {
+    pub fn undo_state(&mut self) {
         if let Some(state) = self.history.pop()
         {
             self.board.set_pieces(state.pieces);

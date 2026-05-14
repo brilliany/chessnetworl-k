@@ -34,3 +34,4 @@ pub fn load_available_memory_from_config(path: &str) -> usize {
         .map(|v| v as usize)
         .unwrap_or(2048)
 }
+

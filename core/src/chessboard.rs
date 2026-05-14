@@ -1,3 +1,4 @@
+use std::arch::x86_64::_mm256_dpbusd_epi32;
 use crate::r#move::{Move, MoveType};
 use crate::*;
 
@@ -142,7 +143,7 @@ impl Chessboard {
         }
     }
 
-    pub(crate) fn update_castling_rights(&mut self, from: u64, to: u64) {
+    fn update_castling_rights(&mut self, from: u64, to: u64) {
         let old_castling = self.castling_rights;
         let mut new_castling = old_castling;
 
@@ -176,15 +177,20 @@ impl Chessboard {
     }
 
     /**
-     Move a piece from one square to another ONLY ON THE PIECE'S OWN BITBOARD
      The move_piece and remove_piece functions assume that the move is valid and legal
     */
-    pub(crate) fn move_piece(&mut self, piece: u8, color: u8, mv: &Move) { 
+    pub(crate) fn move_piece(&mut self, mv: &Move) {
+        let color = mv.get_color();
+        let piece = mv.get_piece_type();
+
         // clear en passant square
         self.en_passant = 0;
         
        let from = mv.get_from_mask();
        let to = mv.get_to_mask();
+
+        self.update_castling_rights(from, to);
+
        let array_index = piece_index(piece, color).unwrap();
        // Remove any piece on the destination square (normal capture)
        self.clear_square(to);
@@ -246,6 +252,16 @@ impl Chessboard {
            self.black_pieces |= to;
        }
    }
+
+    pub(crate) fn undo_move(mv: Move) {
+        let color = mv.get_color();
+        let piece = mv.get_piece_type();
+
+        let from = mv.get_from_mask();
+        let to = mv.get_to_mask();
+
+
+    }
 
    fn clear_square(&mut self, square: u64) {
        let sq = square.trailing_zeros() as usize;

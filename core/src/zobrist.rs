@@ -1,12 +1,17 @@
+use lazy_static::lazy_static;
 use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
 use crate::{Chessboard, BLACK, WHITE, ROOK, PAWN, Move};
 use crate::r#move::MoveType;
 
+
+lazy_static!{
+    pub static ref ZOBRIST: ZobristTable = ZobristTable::new();
+}
+
+
 // check https://en.wikipedia.org/wiki/Zobrist_hashing
 pub struct ZobristTable {
-    //board to keep track of
-    board: Chessboard,
     // values for each piece and square
     piece_keys: [[[u64; 64]; 2]; 6],
     side_to_move: u64,
@@ -150,8 +155,7 @@ pub struct ZobristTable {
 
 impl ZobristTable {
     /// create a new Zobrist table with random values
-    pub fn new(board: Chessboard) -> Self {
-        
+    pub fn new() -> Self {
         //fixed seed, maybe make test to compare seeds
         let mut rng = StdRng::seed_from_u64(69u64);
 
@@ -177,7 +181,6 @@ impl ZobristTable {
         }
         
         ZobristTable {
-            board,
             piece_keys,
             side_to_move,
             castling_keys,
@@ -231,37 +234,6 @@ impl ZobristTable {
         }
 
         hash
-    }
-
-    /// Update hash when a piece is added or removed from a square, taking special moves into account
-    pub(crate) fn update(mv: Move , hash: &mut u64, zobrist: &ZobristTable) {
-        // Handle special moves first
-        match mv.move_type() {
-            MoveType::Normal => {
-                    // Toggle the moving piece from its origin square
-                    zobrist.toggle_piece(hash, mv.get_piece_type(), mv.get_color(), mv.get_from_mask().trailing_zeros() as usize);
-                    // Toggle the moving piece at its destination
-                    zobrist.toggle_piece(hash, mv.get_piece_type(), mv.get_color(), mv.get_to_mask().trailing_zeros() as usize);
-            }
-            MoveType::EnPassant { captured_square } => {
-                zobrist.toggle_piece(hash, PAWN, if mv.get_color() == WHITE { BLACK } else { WHITE }, captured_square.trailing_zeros() as usize);
-            }
-            MoveType::Castling { rook_from, rook_to } => {
-                zobrist.toggle_piece(hash, ROOK, mv.get_color(), rook_from.trailing_zeros() as usize);
-                zobrist.toggle_piece(hash, ROOK, mv.get_color(), rook_to.trailing_zeros() as usize);
-            }
-            MoveType::Promotion { promoted_piece } => {
-                // Toggle out the pawn and toggle in the promoted piece
-                zobrist.toggle_piece(hash, PAWN, mv.get_color(), mv.get_from_mask().trailing_zeros() as usize);
-                zobrist.toggle_piece(hash, promoted_piece, mv.get_color(), mv.get_to_mask().trailing_zeros() as usize);
-                return; // Promotion is a special case, so we return early after handling it
-            },
-            MoveType::DoublePawnPush => {
-                // Set en_passant to the file (1–8) of the pawn that just double-pushed, or 0 for none.
-                let file = (mv.get_from_mask().trailing_zeros() % 8 + 1) as u8;
-                zobrist.toggle_en_passant(hash, file as usize);
-            }
-        }
     }
 
     /// Update hash when a piece moves

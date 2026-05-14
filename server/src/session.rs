@@ -1,5 +1,4 @@
-use chessnetwork_core::Chessboard;
-use chessnetwork_core::Move;
+use chessnetwork_core::{Chessboard, Game, Move};
 
 /**
 * Session struct
@@ -11,18 +10,16 @@ use chessnetwork_core::Move;
 #[derive(Clone)]
 pub(crate) struct Session {
     pub(crate) id: String,
-    pub(crate) board: Chessboard,
-    turn: u8,
+    game: Game,
     user_color: u8,
     opponent_color: u8,
 }
 
 impl Session {
-    pub(crate) fn new(id: String, board: Chessboard, turn: u8, user_color: u8, opponent_color: u8) -> Session {
+    pub(crate) fn new(id: String, game: Game, user_color: u8, opponent_color: u8) -> Session {
         Session {
             id,
-            board,
-            turn,
+            game,
             user_color,
             opponent_color,
         }
@@ -31,10 +28,10 @@ impl Session {
         self.id.clone()
     }
     pub(crate) fn get_board_state(&self) -> Chessboard {
-        self.board.clone()
+        self.game.board().clone()
     }
     pub(crate) fn get_turn(&self) -> u8 {
-        self.turn
+        self.game.turn()
     }
     pub(crate) fn get_opponent_color(&self) -> u8 {
         self.opponent_color
@@ -42,8 +39,7 @@ impl Session {
     pub(crate) fn get_user_color(&self) -> u8 {
         self.user_color
     }
-    pub(crate) fn make_move(&mut self, mv: Move) {
-        self.board.make_move(mv);
-        self.turn ^= 1;
+    pub(crate) fn make_move(&mut self, mv: Move) -> bool {
+        self.game.make_move(mv).is_ok()
     }
 }

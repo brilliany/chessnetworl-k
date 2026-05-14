@@ -195,8 +195,9 @@ async fn get_session_object(
 ) -> Json<SessionResponse> {
     let session = get_or_create_session(&jar, &state.sessions);
 
+    let mut board = session.get_board_state();
     let board_json: serde_json::Value =
-        serde_json::from_str(&session.board.clone().convert_to_json())
+        serde_json::from_str(&board.convert_to_json())
             .expect("board json parse error");
 
     let user_color = session.get_user_color();
@@ -216,7 +217,7 @@ async fn populate_board(
     State(state): State<AppState>,
 ) -> Json<serde_json::Value> {
     let session = get_or_create_session(&jar, &state.sessions);
-    let mut board = session.board.clone();
+    let mut board = session.get_board_state();
 
     let session_count = state.sessions.lock()
         .map(|s| s.len())
@@ -225,7 +226,7 @@ async fn populate_board(
     println!(
         "Sessions: {} | Sending board for session {}",
         session_count,
-        session.id
+        session.get_id()
     );
     board.print_board();
 
@@ -243,11 +244,11 @@ async fn possible_moves(
     let y = params.y;
     let color = params.color;
 
-    let mut session = get_or_create_session(&jar, &state.sessions);
-    let chessboard = &mut session.board;
+    let session = get_or_create_session(&jar, &state.sessions);
+    let chessboard = session.get_board_state();
     chessboard.print_board();
 
-    let moves: Vec<MoveJson> = generate_moves(chessboard, color)
+    let moves: Vec<MoveJson> = generate_moves(&chessboard, color)
         .into_iter()
         .filter(|mv| get_from_x(mv) == x && get_from_y(mv) == y)
         .map(|mv| MoveJson {
@@ -291,7 +292,8 @@ async fn move_piece(
             .expect("session not found");
 
         let user_color = session.get_user_color();
-        let selected_move = generate_moves(&mut session.board, user_color)
+        let chessboard = session.get_board_state();
+        let selected_move = generate_moves(&chessboard, user_color)
             .into_iter()
             .find(|mv| {
                 get_from_x(mv) == from_x
@@ -307,14 +309,16 @@ async fn move_piece(
             return axum::http::StatusCode::BAD_REQUEST;
         };
 
-        session.make_move(selected_move);
+        if !session.make_move(selected_move) {
+            return axum::http::StatusCode::BAD_REQUEST;
+        }
 
         println!(
             "Sessions: {} | Session {} board:",
             count,
-            session.id
+            session.get_id()
         );
-        session.board.print_board();
+        session.get_board_state().print_board();
     };
 
     axum::http::StatusCode::OK
@@ -337,7 +341,7 @@ async fn make_engine_move(
         };
 
         let session = sessions.get_mut(&session_id).unwrap();
-        (session.board.clone(), session.get_opponent_color())
+        (session.get_board_state(), session.get_opponent_color())
     };
 
     // run engine without lock to not block requests
@@ -345,7 +349,7 @@ async fn make_engine_move(
     let heuristics = load_heuristics_from_config("config.yml");
     let available_memory = load_available_memory_from_config("config.yml");
     let mut engine = Engine::new(60, opponent_color, heuristics, available_memory);
-    let engine_move = engine.get_best_move(&mut board).unwrap();
+    let engine_move = engine.get_best_move(board).unwrap();
 
     let result = MoveJson {
         from_x: get_from_x(&engine_move),
@@ -368,8 +372,9 @@ async fn make_engine_move(
         let session = sessions
             .get_mut(&session_id)
             .expect("session not found");
-
-        session.make_move(engine_move);
+        if !session.make_move(engine_move) {
+            eprintln!("Engine move rejected for session {}", session.get_id());
+        }
     }
 
     Json(result)
@@ -423,9 +428,8 @@ fn get_or_create_session(jar: &CookieJar, sessions: &Sessions) -> Session {
     };
 
     if !map.contains_key(&id) {
-        let mut board = Chessboard::default();
-        board.new();
-        let session = Session::new(id.clone(), board, 1, WHITE, BLACK);
+        let game = Game::new();
+        let session = Session::new(id.clone(), game, WHITE, BLACK);
         map.insert(id.clone(), session);
     }
 

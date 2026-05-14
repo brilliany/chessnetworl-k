@@ -69,7 +69,7 @@ impl Move {
             move_type: MoveType::Promotion { promoted_piece },
         }
     }
-    
+
     ///Would be nice just to call this 'type' wouldnt it
     pub fn move_type(&self) -> MoveType {
         self.move_type

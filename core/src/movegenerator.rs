@@ -2,7 +2,7 @@ use crate::chessboard::Chessboard;
 use crate::r#move::Move;
 use crate::{BISHOP, BLACK, BLACK_KINGSIDE_CASTLE, BLACK_QUEENSIDE_CASTLE, FILES, KING, KNIGHT, PAWN, QUEEN, RANKS, ROOK, WHITE, WHITE_KINGSIDE_CASTLE, WHITE_QUEENSIDE_CASTLE};
 
-pub fn generate_moves(chessboard: &mut Chessboard, color: u8) -> Vec<Move> {
+pub fn generate_moves(chessboard: &Chessboard, color: u8) -> Vec<Move> {
     let mut moves = Vec::new();
 
     get_pawn_moves(chessboard, color, &mut moves);
@@ -10,20 +10,24 @@ pub fn generate_moves(chessboard: &mut Chessboard, color: u8) -> Vec<Move> {
     get_bishop_moves(chessboard, color, &mut moves, None);
     get_rook_moves(chessboard, color, &mut moves, None);
     get_queen_moves(chessboard, color, &mut moves);
-    get_king_moves(chessboard, color, &mut moves);
+
+    //big todo, make lightweighter check check
+    let mut mut_board = chessboard.clone();
+    get_king_moves(&mut mut_board, color, &mut moves);
 
     moves.retain(|mv| {
-        chessboard.make_move(*mv);
-        let king_mask = chessboard.get_piece_mask(KING, color);
-        let legal = !is_square_attacked(chessboard, king_mask, color^1);
-        chessboard.undo_move();
+        let snapshot = mut_board.clone();
+        mut_board.move_piece(mv);
+        let king_mask = mut_board.get_piece_mask(KING, color);
+        let legal = !is_square_attacked(&mut_board, king_mask, color^1);
+        mut_board = snapshot;
         legal
     });
 
     moves
 }
 
-//todo castling, en pessant, promotion
+//todo castling, en passant, promotion
 pub fn get_pawn_moves(chessboard: &Chessboard, color: u8, moves: &mut Vec<Move>) {
     // todo add an 'en passant mask' and use that instead of checking the last move
     if color == WHITE {
@@ -450,11 +454,12 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: u8, moves: &mut Vec<Mo
 
         while move_mask != 0 {
             let to = 1u64 << move_mask.trailing_zeros();
-            chessboard.make_move(Move::new(from, to, KING, color));
+            let snapshot = chessboard.clone();
+            chessboard.move_piece(&Move::new(from, to, KING, color));
             if !is_square_attacked(chessboard, to, color^1) {
                 moves.push(Move::new(from, to, KING, color));
             }
-            chessboard.undo_move();
+            *chessboard = snapshot;
             move_mask &= move_mask - 1;
         }
         king_mask &= king_mask - 1;
@@ -465,39 +470,43 @@ pub fn get_king_moves(chessboard: &mut Chessboard, color: u8, moves: &mut Vec<Mo
     if color == WHITE {
         if (castling_rights & WHITE_KINGSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 1) | (1 << 2))) == 0 {
-                chessboard.make_move(Move::castling(1 << 3, 1 << 1, KING, WHITE, 1 << 0, 1 << 2));
+                let snapshot = chessboard.clone();
+                chessboard.move_piece(&Move::castling(1 << 3, 1 << 1, KING, WHITE, 1 << 0, 1 << 2));
                 if !is_square_attacked(chessboard, 1 << 2, color^1) && !is_square_attacked(chessboard, 1 << 1, color^1) {
                     moves.push(Move::castling(1 << 3, 1 << 1, KING, WHITE, 1 << 0, 1 << 2));
                 }
-                chessboard.undo_move();
+                *chessboard = snapshot;
             }
         }
         if (castling_rights & WHITE_QUEENSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 4) | (1 << 5) | (1 << 6))) == 0 {
-                chessboard.make_move(Move::castling(1 << 3, 1 << 5, KING, WHITE, 1 << 7, 1 << 4));
+                let snapshot = chessboard.clone();
+                chessboard.move_piece(&Move::castling(1 << 3, 1 << 5, KING, WHITE, 1 << 7, 1 << 4));
                 if !is_square_attacked(chessboard, 1 << 4, color^1) && !is_square_attacked(chessboard, 1 << 5, color^1) {
                     moves.push(Move::castling(1 << 3, 1 << 5, KING, WHITE, 1 << 7, 1 << 4));
                 }
-                chessboard.undo_move();
+                *chessboard = snapshot;
             }
         }
     } else {
         if (castling_rights & BLACK_KINGSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 57) | (1 << 58))) == 0 {
-                chessboard.make_move(Move::castling(1 << 59, 1 << 57, KING, BLACK, 1 << 56, 1 << 58));
+                let snapshot = chessboard.clone();
+                chessboard.move_piece(&Move::castling(1 << 59, 1 << 57, KING, BLACK, 1 << 56, 1 << 58));
                 if !is_square_attacked(chessboard, 1 << 58, color^1) && !is_square_attacked(chessboard, 1 << 57, color^1) {
                     moves.push(Move::castling(1 << 59, 1 << 57, KING, BLACK, 1 << 56, 1 << 58));
                 }
-                chessboard.undo_move();
+                *chessboard = snapshot;
             }
         }
         if (castling_rights & BLACK_QUEENSIDE_CASTLE) != 0 {
             if (occupied & ((1 << 60) | (1 << 61) | (1 << 62))) == 0 {
-                chessboard.make_move(Move::castling(1 << 59, 1 << 61, KING, BLACK, 1 << 63, 1 << 60));
+                let snapshot = chessboard.clone();
+                chessboard.move_piece(&Move::castling(1 << 59, 1 << 61, KING, BLACK, 1 << 63, 1 << 60));
                 if !is_square_attacked(chessboard, 1 << 60, color^1) && !is_square_attacked(chessboard, 1 << 61, color^1) {
                     moves.push(Move::castling(1 << 59, 1 << 61, KING, BLACK, 1 << 63, 1 << 60));
                 }
-                chessboard.undo_move();
+                *chessboard = snapshot;
             }
         }
     }

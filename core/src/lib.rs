@@ -1,6 +1,7 @@
 pub mod chessboard;
 pub mod movegenerator;
 pub mod engine;
+pub mod game;
 
 // Internal
 pub mod heuristics;
@@ -8,7 +9,6 @@ pub mod config_loader;
 
 mod r#move;
 pub mod constants;
-mod game;
 mod zobrist;
 
 define_consts!();
@@ -17,6 +17,7 @@ pub use r#move::Move;
 
 pub use chessboard::Chessboard;
 pub use engine::Engine;
+pub use game::{Game, GameStatus};
 pub use heuristics::HeuristicParams;
 pub use config_loader::load_heuristics_from_config;
 pub use config_loader::load_available_memory_from_config;
